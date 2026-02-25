@@ -1,8 +1,11 @@
 {
-  "name": "web-vector-base",
-  "private": true,
+  "name": "eigen-db",
   "version": "0.0.0",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/",
   "scripts": {
     "dev": "vite",
     "compile-wat": "tsx scripts/compile-wat.ts",

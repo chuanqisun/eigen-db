@@ -1,3 +1,3 @@
-# Web Vector Base
+# Eigen
 
-A single purpose database for semantic text retrievals
+High performance vector database for the web
