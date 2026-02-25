@@ -5,14 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "compile-wat": "tsx scripts/compile-wat.ts",
+    "build": "npm run compile-wat && tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench"
   },
   "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vite": "^7.3.1"
-  },
-  "dependencies": {
-    "vitest": "^4.0.18"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18",
+    "wabt": "^1.0.39"
   }
 }
