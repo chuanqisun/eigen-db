@@ -6,11 +6,11 @@
  */
 
 export interface ResultItem {
-  text: string;
+  key: string;
   score: number;
 }
 
-export type TextResolver = (index: number) => string;
+export type KeyResolver = (index: number) => string;
 
 export class ResultSet {
   /** Total number of results */
@@ -25,31 +25,31 @@ export class ResultSet {
   /** Raw scores array (not sorted, indexed by original DB position) */
   private readonly scores: Float32Array;
 
-  /** Function to lazily resolve text from the lexicon by DB index */
-  private readonly resolveText: TextResolver;
+  /** Function to lazily resolve key from the slot index */
+  private readonly resolveKey: KeyResolver;
 
   constructor(
     scores: Float32Array,
     sortedIndices: Uint32Array,
-    resolveText: TextResolver,
+    resolveKey: KeyResolver,
     topK: number,
   ) {
     this.scores = scores;
     this.sortedIndices = sortedIndices;
-    this.resolveText = resolveText;
+    this.resolveKey = resolveKey;
     this.length = Math.min(topK, sortedIndices.length);
   }
 
   /**
-   * Sort scores and return a ResultSet with lazy text resolution.
+   * Sort scores and return a ResultSet with lazy key resolution.
    *
    * @param scores - Float32Array of scores (one per DB vector)
-   * @param resolveText - Function to resolve text by original index
+   * @param resolveKey - Function to resolve key by original index
    * @param topK - Maximum number of results to include
    */
   static fromScores(
     scores: Float32Array,
-    resolveText: TextResolver,
+    resolveKey: KeyResolver,
     topK: number,
   ): ResultSet {
     const n = scores.length;
@@ -61,7 +61,7 @@ export class ResultSet {
     // Sort indices by descending score
     indices.sort((a, b) => scores[b] - scores[a]);
 
-    return new ResultSet(scores, indices, resolveText, topK);
+    return new ResultSet(scores, indices, resolveKey, topK);
   }
 
   /** Fetch a single result by its rank (0 is best match) */
@@ -71,7 +71,7 @@ export class ResultSet {
     }
     const dbIndex = this.sortedIndices[rank];
     return {
-      text: this.resolveText(dbIndex),
+      key: this.resolveKey(dbIndex),
       score: this.scores[dbIndex],
     };
   }
