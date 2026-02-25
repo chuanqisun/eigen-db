@@ -1,0 +1,370 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>SIMD Cosine Distance Benchmark</title>
+    <script src="https://unpkg.com/wabt@1.0.32/index.js"></script>
+  </head>
+  <body>
+    <h1>SIMD Cosine Distance Benchmark</h1>
+
+    <div>
+      <label>Vector Dimensions: <input type="number" id="dims" value="256" min="4" step="4" /></label>
+    </div>
+    <div>
+      <label>Iterations: <input type="number" id="iterations" value="100000" min="1" /></label>
+    </div>
+    <div>
+      <label>Number of runs: <input type="number" id="runs" value="5" min="1" max="20" /></label>
+    </div>
+    <br />
+    <button id="runBtn">Run Benchmark</button>
+    <br /><br />
+    <pre id="output">Click "Run Benchmark" to start.</pre>
+
+    <script>
+      const watScalar = `
+(module
+  (memory (export "mem") 100)
+
+  ;; cosine_distance(ptrA, ptrB, dims) -> f32
+  ;; ptrA: byte offset to vector A (f32 array)
+  ;; ptrB: byte offset to vector B (f32 array)
+  ;; dims: number of dimensions
+  (func (export "cosine_distance") (param $pA i32) (param $pB i32) (param $dims i32) (result f32)
+    (local $i i32)
+    (local $dot f32)
+    (local $normA f32)
+    (local $normB f32)
+    (local $a f32)
+    (local $b f32)
+    (local $sim f32)
+
+    (local.set $dot (f32.const 0))
+    (local.set $normA (f32.const 0))
+    (local.set $normB (f32.const 0))
+    (local.set $i (i32.const 0))
+
+    (block $break
+      (loop $loop
+        (br_if $break (i32.ge_u (local.get $i) (local.get $dims)))
+
+        (local.set $a (f32.load (i32.add (local.get $pA) (i32.shl (local.get $i) (i32.const 2)))))
+        (local.set $b (f32.load (i32.add (local.get $pB) (i32.shl (local.get $i) (i32.const 2)))))
+
+        (local.set $dot (f32.add (local.get $dot) (f32.mul (local.get $a) (local.get $b))))
+        (local.set $normA (f32.add (local.get $normA) (f32.mul (local.get $a) (local.get $a))))
+        (local.set $normB (f32.add (local.get $normB) (f32.mul (local.get $b) (local.get $b))))
+
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $loop)
+      )
+    )
+
+    ;; cosine_distance = 1 - dot / sqrt(normA * normB)
+    (local.set $sim
+      (f32.div
+        (local.get $dot)
+        (f32.sqrt (f32.mul (local.get $normA) (local.get $normB)))
+      )
+    )
+    (f32.sub (f32.const 1) (local.get $sim))
+  )
+)
+`;
+
+      const watSimd = `
+(module
+  (memory (export "mem") 100)
+
+  ;; cosine_distance_simd(ptrA, ptrB, dims) -> f32
+  ;; Processes 4 f32 lanes at a time using v128 SIMD
+  (func (export "cosine_distance") (param $pA i32) (param $pB i32) (param $dims i32) (result f32)
+    (local $i i32)
+    (local $dot v128)
+    (local $normA v128)
+    (local $normB v128)
+    (local $a v128)
+    (local $b v128)
+    (local $dotScalar f32)
+    (local $normAScalar f32)
+    (local $normBScalar f32)
+    (local $sim f32)
+    (local $byteLen i32)
+
+    (local.set $dot (v128.const f32x4 0 0 0 0))
+    (local.set $normA (v128.const f32x4 0 0 0 0))
+    (local.set $normB (v128.const f32x4 0 0 0 0))
+    (local.set $i (i32.const 0))
+    (local.set $byteLen (i32.shl (local.get $dims) (i32.const 2)))
+
+    (block $break
+      (loop $loop
+        (br_if $break (i32.ge_u (local.get $i) (local.get $byteLen)))
+
+        ;; Load 4 floats from A and B
+        (local.set $a (v128.load (i32.add (local.get $pA) (local.get $i))))
+        (local.set $b (v128.load (i32.add (local.get $pB) (local.get $i))))
+
+        ;; Accumulate dot product and norms
+        (local.set $dot (f32x4.add (local.get $dot) (f32x4.mul (local.get $a) (local.get $b))))
+        (local.set $normA (f32x4.add (local.get $normA) (f32x4.mul (local.get $a) (local.get $a))))
+        (local.set $normB (f32x4.add (local.get $normB) (f32x4.mul (local.get $b) (local.get $b))))
+
+        ;; Advance by 16 bytes (4 floats)
+        (local.set $i (i32.add (local.get $i) (i32.const 16)))
+        (br $loop)
+      )
+    )
+
+    ;; Horizontal sum: reduce 4 lanes to scalar
+    ;; dot
+    (local.set $dotScalar
+      (f32.add
+        (f32.add
+          (f32x4.extract_lane 0 (local.get $dot))
+          (f32x4.extract_lane 1 (local.get $dot))
+        )
+        (f32.add
+          (f32x4.extract_lane 2 (local.get $dot))
+          (f32x4.extract_lane 3 (local.get $dot))
+        )
+      )
+    )
+    ;; normA
+    (local.set $normAScalar
+      (f32.add
+        (f32.add
+          (f32x4.extract_lane 0 (local.get $normA))
+          (f32x4.extract_lane 1 (local.get $normA))
+        )
+        (f32.add
+          (f32x4.extract_lane 2 (local.get $normA))
+          (f32x4.extract_lane 3 (local.get $normA))
+        )
+      )
+    )
+    ;; normB
+    (local.set $normBScalar
+      (f32.add
+        (f32.add
+          (f32x4.extract_lane 0 (local.get $normB))
+          (f32x4.extract_lane 1 (local.get $normB))
+        )
+        (f32.add
+          (f32x4.extract_lane 2 (local.get $normB))
+          (f32x4.extract_lane 3 (local.get $normB))
+        )
+      )
+    )
+
+    ;; cosine_distance = 1 - dot / sqrt(normA * normB)
+    (local.set $sim
+      (f32.div
+        (local.get $dotScalar)
+        (f32.sqrt (f32.mul (local.get $normAScalar) (local.get $normBScalar)))
+      )
+    )
+    (f32.sub (f32.const 1) (local.get $sim))
+  )
+)
+`;
+
+      function jsCosineDistance(a, b) {
+        let dot = 0,
+          normA = 0,
+          normB = 0;
+        for (let i = 0; i < a.length; i++) {
+          dot += a[i] * b[i];
+          normA += a[i] * a[i];
+          normB += b[i] * b[i];
+        }
+        return 1 - dot / Math.sqrt(normA * normB);
+      }
+
+      async function compileWat(wabtModule, watSource, enableSimd) {
+        const features = { simd: enableSimd };
+        const parsed = wabtModule.parseWat("module.wat", watSource, features);
+        const binary = parsed.toBinary({ write_debug_names: false });
+        parsed.destroy();
+        const compiled = await WebAssembly.compile(binary.buffer);
+        const instance = await WebAssembly.instantiate(compiled);
+        return instance;
+      }
+
+      function fillVectors(mem, ptrA, ptrB, dims) {
+        const view = new Float32Array(mem.buffer, ptrA, dims);
+        const view2 = new Float32Array(mem.buffer, ptrB, dims);
+        for (let i = 0; i < dims; i++) {
+          view[i] = Math.random() * 2 - 1;
+          view2[i] = Math.random() * 2 - 1;
+        }
+      }
+
+      function copyVectorsToMemory(mem, ptrA, ptrB, srcA, srcB) {
+        const a = new Float32Array(mem.buffer, ptrA, srcA.length);
+        const b = new Float32Array(mem.buffer, ptrB, srcB.length);
+        a.set(srcA);
+        b.set(srcB);
+      }
+
+      const output = document.getElementById("output");
+
+      function log(msg) {
+        output.textContent += msg + "\n";
+      }
+
+      document.getElementById("runBtn").addEventListener("click", async () => {
+        const dims = parseInt(document.getElementById("dims").value);
+        const iterations = parseInt(document.getElementById("iterations").value);
+        const numRuns = parseInt(document.getElementById("runs").value);
+
+        if (dims < 4 || dims % 4 !== 0) {
+          output.textContent = "Dimensions must be a multiple of 4 (>= 4).";
+          return;
+        }
+
+        output.textContent = "";
+        log(`Benchmark: Cosine Distance`);
+        log(`Dimensions: ${dims}, Iterations: ${iterations}, Runs: ${numRuns}`);
+        log(`Compiling WAT modules...`);
+
+        let wabtModule;
+        try {
+          wabtModule = await WabtModule();
+        } catch (e) {
+          log("Failed to load WABT: " + e.message);
+          return;
+        }
+
+        let scalarInstance, simdInstance;
+        try {
+          scalarInstance = await compileWat(wabtModule, watScalar, false);
+          log("  Scalar WASM compiled OK");
+        } catch (e) {
+          log("  Scalar compile error: " + e.message);
+          return;
+        }
+
+        try {
+          simdInstance = await compileWat(wabtModule, watSimd, true);
+          log("  SIMD WASM compiled OK");
+        } catch (e) {
+          log("  SIMD compile error: " + e.message);
+          log("  (Your browser may not support WASM SIMD)");
+          return;
+        }
+
+        // Generate random vectors
+        const vecA = new Float32Array(dims);
+        const vecB = new Float32Array(dims);
+        for (let i = 0; i < dims; i++) {
+          vecA[i] = Math.random() * 2 - 1;
+          vecB[i] = Math.random() * 2 - 1;
+        }
+
+        const bytesPerVec = dims * 4;
+        const ptrA = 0;
+        const ptrB = bytesPerVec;
+
+        // Copy vectors into both wasm memories
+        copyVectorsToMemory(scalarInstance.exports.mem, ptrA, ptrB, vecA, vecB);
+        copyVectorsToMemory(simdInstance.exports.mem, ptrA, ptrB, vecA, vecB);
+
+        // Verify correctness
+        const jsResult = jsCosineDistance(vecA, vecB);
+        const scalarResult = scalarInstance.exports.cosine_distance(ptrA, ptrB, dims);
+        const simdResult = simdInstance.exports.cosine_distance(ptrA, ptrB, dims);
+
+        log("");
+        log(`--- Correctness Check ---`);
+        log(`  JS result:     ${jsResult.toFixed(10)}`);
+        log(`  Scalar result: ${scalarResult.toFixed(10)}`);
+        log(`  SIMD result:   ${simdResult.toFixed(10)}`);
+        log(`  (Small differences expected due to f32 vs f64 precision)`);
+
+        // Warmup
+        log("");
+        log("Warming up...");
+        for (let i = 0; i < 1000; i++) {
+          jsCosineDistance(vecA, vecB);
+          scalarInstance.exports.cosine_distance(ptrA, ptrB, dims);
+          simdInstance.exports.cosine_distance(ptrA, ptrB, dims);
+        }
+
+        log("");
+        log(`--- Benchmark Results (${numRuns} runs of ${iterations.toLocaleString()} iterations) ---`);
+        log("");
+
+        const jsTimings = [];
+        const scalarTimings = [];
+        const simdTimings = [];
+
+        for (let run = 0; run < numRuns; run++) {
+          // JS benchmark
+          let t0 = performance.now();
+          let sink = 0;
+          for (let i = 0; i < iterations; i++) {
+            sink += jsCosineDistance(vecA, vecB);
+          }
+          let t1 = performance.now();
+          const jsTime = t1 - t0;
+          jsTimings.push(jsTime);
+
+          // Scalar WASM benchmark
+          t0 = performance.now();
+          sink = 0;
+          for (let i = 0; i < iterations; i++) {
+            sink += scalarInstance.exports.cosine_distance(ptrA, ptrB, dims);
+          }
+          t1 = performance.now();
+          const scalarTime = t1 - t0;
+          scalarTimings.push(scalarTime);
+
+          // SIMD WASM benchmark
+          t0 = performance.now();
+          sink = 0;
+          for (let i = 0; i < iterations; i++) {
+            sink += simdInstance.exports.cosine_distance(ptrA, ptrB, dims);
+          }
+          t1 = performance.now();
+          const simdTime = t1 - t0;
+          simdTimings.push(simdTime);
+
+          log(`Run ${run + 1}/${numRuns}:`);
+          log(`  JS:          ${jsTime.toFixed(2)} ms`);
+          log(`  WASM Scalar: ${scalarTime.toFixed(2)} ms`);
+          log(`  WASM SIMD:   ${simdTime.toFixed(2)} ms`);
+          log(`  SIMD speedup vs Scalar: ${(scalarTime / simdTime).toFixed(2)}x`);
+          log(`  SIMD speedup vs JS:     ${(jsTime / simdTime).toFixed(2)}x`);
+          log("");
+        }
+
+        const avg = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+        const min = (arr) => Math.min(...arr);
+
+        const jsAvg = avg(jsTimings);
+        const scalarAvg = avg(scalarTimings);
+        const simdAvg = avg(simdTimings);
+        const jsMin = min(jsTimings);
+        const scalarMin = min(scalarTimings);
+        const simdMin = min(simdTimings);
+
+        const opsPerSecJs = iterations / (jsMin / 1000);
+        const opsPerSecScalar = iterations / (scalarMin / 1000);
+        const opsPerSecSimd = iterations / (simdMin / 1000);
+
+        log(`=== Summary ===`);
+        log(`                  Avg (ms)    Best (ms)    Ops/sec (best)`);
+        log(`  JS:           ${jsAvg.toFixed(2).padStart(10)}  ${jsMin.toFixed(2).padStart(10)}  ${opsPerSecJs.toFixed(0).padStart(14)}`);
+        log(`  WASM Scalar:  ${scalarAvg.toFixed(2).padStart(10)}  ${scalarMin.toFixed(2).padStart(10)}  ${opsPerSecScalar.toFixed(0).padStart(14)}`);
+        log(`  WASM SIMD:    ${simdAvg.toFixed(2).padStart(10)}  ${simdMin.toFixed(2).padStart(10)}  ${opsPerSecSimd.toFixed(0).padStart(14)}`);
+        log("");
+        log(`  Best SIMD speedup vs Scalar: ${(scalarMin / simdMin).toFixed(2)}x`);
+        log(`  Best SIMD speedup vs JS:     ${(jsMin / simdMin).toFixed(2)}x`);
+        log("");
+        log("Done.");
+      });
+    </script>
+  </body>
+</html>
