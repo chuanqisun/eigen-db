@@ -80,13 +80,11 @@ export class VectorDB {
     const keys = keysBytes.byteLength > 0 ? decodeLexicon(keysBytes) : [];
     const vectorCount = vectorBytes.byteLength / (options.dimensions * 4);
 
-    // Build key-to-slot mapping
+    // Build key-to-slot mapping.
+    // flush() always writes deduplicated state, so keys are unique on load.
     const keyToSlot = new Map<string, number>();
     const slotToKey: string[] = [];
 
-    // Rebuild mapping — handle last-write-wins for persisted data
-    // On load, keys are stored in order. If a key appears multiple times
-    // (from a non-compacted flush), last one wins.
     for (let i = 0; i < keys.length; i++) {
       keyToSlot.set(keys[i], i);
       slotToKey[i] = keys[i];
@@ -228,7 +226,7 @@ export class VectorDB {
     // Ensure memory has space for scores buffer
     this.memoryManager.ensureCapacity(0);
 
-    // Total vectors in memory (may include dead slots if we ever implement compaction)
+    // Total vectors in memory
     const totalVectors = this.memoryManager.vectorCount;
 
     // Execute search
