@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
-    "vite": "^7.3.1"
-  },
-  "dependencies": {
-    "vitest": "^4.0.18"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18",
+    "wabt": "^1.0.39"
   }
 }
