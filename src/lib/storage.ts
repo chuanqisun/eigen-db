@@ -10,6 +10,9 @@ export interface StorageProvider {
   /** Append data to a file (creates if it doesn't exist). */
   append(fileName: string, data: Uint8Array): Promise<void>;
 
+  /** Write data to a file, replacing all existing content. */
+  write(fileName: string, data: Uint8Array): Promise<void>;
+
   /** Delete the storage directory and all files. */
   destroy(): Promise<void>;
 }
@@ -56,6 +59,14 @@ export class OPFSStorageProvider implements StorageProvider {
     await writable.close();
   }
 
+  async write(fileName: string, data: Uint8Array): Promise<void> {
+    const dir = await this.getDir();
+    const fileHandle = await dir.getFileHandle(fileName, { create: true });
+    const writable = await fileHandle.createWritable({ keepExistingData: false });
+    await writable.write(data as unknown as BufferSource);
+    await writable.close();
+  }
+
   async destroy(): Promise<void> {
     const root = await navigator.storage.getDirectory();
     await root.removeEntry(this.dirName, { recursive: true });
@@ -88,6 +99,10 @@ export class InMemoryStorageProvider implements StorageProvider {
       this.files.set(fileName, []);
     }
     this.files.get(fileName)!.push(new Uint8Array(data));
+  }
+
+  async write(fileName: string, data: Uint8Array): Promise<void> {
+    this.files.set(fileName, [new Uint8Array(data)]);
   }
 
   async destroy(): Promise<void> {

@@ -128,4 +128,20 @@ export class MemoryManager {
     const offset = this.dbOffset + index * this.dimensions * 4;
     return new Float32Array(this.memory.buffer, offset, this.dimensions);
   }
+
+  /**
+   * Write a vector to a specific slot in the database region.
+   */
+  writeVector(index: number, vector: Float32Array): void {
+    const offset = this.dbOffset + index * this.dimensions * 4;
+    new Float32Array(this.memory.buffer, offset, this.dimensions).set(vector);
+  }
+
+  /**
+   * Reset the vector count to zero, logically clearing the database.
+   * WASM memory is not freed but will be overwritten on next writes.
+   */
+  reset(): void {
+    this._vectorCount = 0;
+  }
 }

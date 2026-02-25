@@ -1,19 +1,17 @@
 import "./style.css";
-import { VectorEngine, InMemoryStorageProvider } from "./lib/index";
+import { VectorDB, InMemoryStorageProvider } from "./lib/index";
 
 const DIMENSIONS = 128;
 
 /** Simple character-frequency embedder for demo purposes */
-const demoEmbedder = async (texts: string[]): Promise<Float32Array[]> => {
-  return texts.map((text) => {
-    const vec = new Float32Array(DIMENSIONS);
-    const lower = text.toLowerCase();
-    for (let i = 0; i < lower.length; i++) {
-      vec[lower.charCodeAt(i) % DIMENSIONS] += 1;
-    }
-    return vec;
-  });
-};
+function embed(text: string): Float32Array {
+  const vec = new Float32Array(DIMENSIONS);
+  const lower = text.toLowerCase();
+  for (let i = 0; i < lower.length; i++) {
+    vec[lower.charCodeAt(i) % DIMENSIONS] += 1;
+  }
+  return vec;
+}
 
 /** Generate random strings of a given length */
 function randomString(len: number): string {
@@ -51,7 +49,7 @@ async function main() {
   const status = document.querySelector<HTMLDivElement>("#status")!;
   const resultsDiv = document.querySelector<HTMLDivElement>("#results")!;
 
-  let db: VectorEngine | null = null;
+  let db: VectorDB | null = null;
 
   function log(msg: string) {
     status.textContent = msg;
@@ -68,22 +66,21 @@ async function main() {
     log(`Generating ${count} random strings…`);
     await new Promise((r) => setTimeout(r, 0)); // let UI update
 
-    const texts: string[] = [];
+    const entries: [string, Float32Array][] = [];
     for (let i = 0; i < count; i++) {
-      texts.push(randomString(8 + ((Math.random() * 24) | 0)));
+      const text = randomString(8 + ((Math.random() * 24) | 0));
+      entries.push([text, embed(text)]);
     }
 
     log(`Indexing ${count} records…`);
     await new Promise((r) => setTimeout(r, 0));
 
     const start = performance.now();
-    db = await VectorEngine.open({
-      name: "demo-perf",
+    db = await VectorDB.open({
       dimensions: DIMENSIONS,
-      embedder: demoEmbedder,
       storage: new InMemoryStorageProvider(),
     });
-    await db.add(texts);
+    db.setMany(entries);
     const elapsed = (performance.now() - start).toFixed(1);
 
     log(`Indexed ${db.size} records in ${elapsed} ms`);
@@ -108,7 +105,8 @@ async function main() {
 
     log("Searching…");
     const start = performance.now();
-    const results = await db.search(query, topK);
+    const queryVec = embed(query);
+    const results = db.query(queryVec, { topK });
     const elapsed = (performance.now() - start).toFixed(1);
 
     log(
@@ -116,10 +114,10 @@ async function main() {
     );
 
     const page = results.getPage(0, topK);
-    let html = "<table><thead><tr><th>#</th><th>Score</th><th>Text</th></tr></thead><tbody>";
+    let html = "<table><thead><tr><th>#</th><th>Score</th><th>Key</th></tr></thead><tbody>";
     for (let i = 0; i < page.length; i++) {
       const r = page[i];
-      html += `<tr><td>${i + 1}</td><td>${r.score.toFixed(4)}</td><td>${r.text}</td></tr>`;
+      html += `<tr><td>${i + 1}</td><td>${r.score.toFixed(4)}</td><td>${r.key}</td></tr>`;
     }
     html += "</tbody></table>";
     resultsDiv.innerHTML = html;

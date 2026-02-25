@@ -5,11 +5,10 @@
  * utilizing OPFS for persistent storage and WASM SIMD for computation.
  */
 
-export { VectorEngine } from "./vector-engine";
-export type { VectorEngineOptions } from "./vector-engine";
+export { VectorDB } from "./vector-db";
 export { ResultSet } from "./result-set";
 export type { ResultItem } from "./result-set";
 export { VectorCapacityExceededError } from "./errors";
-export type { EmbeddingFunction, EngineConfig } from "./types";
+export type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions } from "./types";
 export { InMemoryStorageProvider, OPFSStorageProvider } from "./storage";
 export type { StorageProvider } from "./storage";
