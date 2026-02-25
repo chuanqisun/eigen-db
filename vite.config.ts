@@ -5,8 +5,8 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, "src/lib/index.ts"),
-      name: "WebVectorBase",
-      fileName: "web-vector-base",
+      name: "EigenDB",
+      fileName: "eigen-db",
     },
   },
   test: {
