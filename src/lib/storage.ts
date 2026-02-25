@@ -20,8 +20,11 @@ export interface StorageProvider {
  */
 export class OPFSStorageProvider implements StorageProvider {
   private dirHandle: FileSystemDirectoryHandle | null = null;
+  private dirName: string;
 
-  constructor(private readonly dirName: string) {}
+  constructor(dirName: string) {
+    this.dirName = dirName;
+  }
 
   private async getDir(): Promise<FileSystemDirectoryHandle> {
     if (!this.dirHandle) {
@@ -49,7 +52,7 @@ export class OPFSStorageProvider implements StorageProvider {
     const writable = await fileHandle.createWritable({ keepExistingData: true });
     const file = await fileHandle.getFile();
     await writable.seek(file.size);
-    await writable.write(data);
+    await writable.write(data as unknown as BufferSource);
     await writable.close();
   }
 

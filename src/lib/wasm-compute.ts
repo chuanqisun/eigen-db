@@ -34,6 +34,8 @@ export async function instantiateWasm(
   memory: WebAssembly.Memory,
 ): Promise<WasmExports> {
   const importObject = { env: { memory } };
-  const { instance } = await WebAssembly.instantiate(wasmBinary, importObject);
+  const result = await WebAssembly.instantiate(wasmBinary, importObject);
+  // WebAssembly.instantiate with a buffer returns { instance, module }
+  const instance = (result as unknown as { instance: WebAssembly.Instance }).instance;
   return instance.exports as unknown as WasmExports;
 }
