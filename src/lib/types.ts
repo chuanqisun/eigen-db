@@ -39,8 +39,10 @@ export interface SetOptions {
  * Returns a plain ResultItem[] array by default.
  */
 export interface QueryOptions {
-  /** Maximum number of results to return. Defaults to all. */
+  /** Maximum number of results to return. Defaults to Infinity (all results). */
   topK?: number;
+  /** Maximum distance threshold (inclusive). Results with distance > maxDistance are excluded. */
+  maxDistance?: number;
   /** Override normalization for this call. */
   normalize?: boolean;
   /** When true, returns an Iterable<ResultItem> instead of ResultItem[]. */
