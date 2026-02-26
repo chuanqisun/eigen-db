@@ -19,9 +19,9 @@ npm install eigen-db
 ### 1) Open a database
 
 ```ts
-import { VectorDB } from "eigen-db";
+import { DB } from "eigen-db";
 
-const db = await VectorDB.open({
+const db = await DB.open({
   name: "my-index", // optional, defaults to "default"
   dimensions: 1536, // required
   normalize: true, // optional, defaults to true
@@ -79,7 +79,7 @@ await db.clear();
 ## Exports
 
 ```ts
-export { VectorDB };
+export { DB };
 export { ResultSet };
 export type { ResultItem };
 export { VectorCapacityExceededError };
@@ -88,13 +88,13 @@ export { InMemoryStorageProvider, OPFSStorageProvider };
 export type { StorageProvider };
 ```
 
-### `VectorDB`
+### `DB`
 
-#### `VectorDB.open(options)`
+#### `DB.open(options)`
 
 ```ts
-static open(options: OpenOptions): Promise<VectorDB>
-static open(options: OpenOptionsInternal): Promise<VectorDB>
+static open(options: OpenOptions): Promise<DB>
+static open(options: OpenOptionsInternal): Promise<DB>
 ```
 
 Opens (or creates) a database instance and loads persisted data.

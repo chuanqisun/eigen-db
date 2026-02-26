@@ -5,10 +5,10 @@
  * utilizing OPFS for persistent storage and WASM SIMD for computation.
  */
 
-export { VectorDB } from "./vector-db";
+export { VectorCapacityExceededError } from "./errors";
 export { ResultSet } from "./result-set";
 export type { ResultItem } from "./result-set";
-export { VectorCapacityExceededError } from "./errors";
-export type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions } from "./types";
 export { InMemoryStorageProvider, OPFSStorageProvider } from "./storage";
 export type { StorageProvider } from "./storage";
+export type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions } from "./types";
+export { VectorDB as DB } from "./vector-db";

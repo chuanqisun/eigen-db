@@ -1,3 +1,7 @@
+# v2.0.0
+
+Changed: export name from `VectorDB` to `DB`
+
 # v1.2.0
 
 Added: README.md

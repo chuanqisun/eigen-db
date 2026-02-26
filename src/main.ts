@@ -1,5 +1,5 @@
+import { DB, InMemoryStorageProvider } from "./lib/index";
 import "./style.css";
-import { VectorDB, InMemoryStorageProvider } from "./lib/index";
 
 const DIMENSIONS = 128;
 
@@ -49,7 +49,7 @@ async function main() {
   const status = document.querySelector<HTMLDivElement>("#status")!;
   const resultsDiv = document.querySelector<HTMLDivElement>("#results")!;
 
-  let db: VectorDB | null = null;
+  let db: DB | null = null;
 
   function log(msg: string) {
     status.textContent = msg;
@@ -57,10 +57,7 @@ async function main() {
 
   // Generate dataset
   document.querySelector("#gen-btn")!.addEventListener("click", async () => {
-    const count = parseInt(
-      (document.querySelector("#gen-count") as HTMLInputElement).value,
-      10,
-    );
+    const count = parseInt((document.querySelector("#gen-count") as HTMLInputElement).value, 10);
     if (!count || count < 1) return;
 
     log(`Generating ${count} random strings…`);
@@ -76,7 +73,7 @@ async function main() {
     await new Promise((r) => setTimeout(r, 0));
 
     const start = performance.now();
-    db = await VectorDB.open({
+    db = await DB.open({
       dimensions: DIMENSIONS,
       storage: new InMemoryStorageProvider(),
     });
@@ -94,13 +91,8 @@ async function main() {
       return;
     }
 
-    const query = (
-      document.querySelector("#search-input") as HTMLInputElement
-    ).value.trim();
-    const topK = parseInt(
-      (document.querySelector("#top-k") as HTMLInputElement).value,
-      10,
-    );
+    const query = (document.querySelector("#search-input") as HTMLInputElement).value.trim();
+    const topK = parseInt((document.querySelector("#top-k") as HTMLInputElement).value, 10);
     if (!query) return;
 
     log("Searching…");
@@ -109,9 +101,7 @@ async function main() {
     const results = db.query(queryVec, { topK });
     const elapsed = (performance.now() - start).toFixed(1);
 
-    log(
-      `Search: ${elapsed} ms — ${results.length} results from ${db.size} records (top ${topK})`,
-    );
+    log(`Search: ${elapsed} ms — ${results.length} results from ${db.size} records (top ${topK})`);
 
     const page = results.getPage(0, topK);
     let html = "<table><thead><tr><th>#</th><th>Score</th><th>Key</th></tr></thead><tbody>";
