@@ -9,6 +9,7 @@
     "README.md"
   ],
   "main": "./dist/",
+  "types": "./src/lib/index.ts",
   "scripts": {
     "dev": "vite",
     "compile-wat": "tsx scripts/compile-wat.ts",
