@@ -23,6 +23,8 @@ function randomString(len: number): string {
   return s;
 }
 
+const EIGEN_DB_MIME = "application/x-eigen-db";
+
 async function main() {
   const app = document.querySelector<HTMLDivElement>("#app")!;
   app.innerHTML = `
@@ -42,17 +44,29 @@ async function main() {
       <button id="search-btn">Search</button>
     </fieldset>
 
+    <fieldset>
+      <legend>Export / Import</legend>
+      <button id="export-btn" disabled>Export database (.bin)</button>
+      <label>Import: <input id="import-file" type="file" accept=".bin" /></label>
+    </fieldset>
+
     <div id="status">Initializing…</div>
     <div id="results"></div>
   `;
 
   const status = document.querySelector<HTMLDivElement>("#status")!;
   const resultsDiv = document.querySelector<HTMLDivElement>("#results")!;
+  const exportBtn = document.querySelector<HTMLButtonElement>("#export-btn")!;
+  const importFile = document.querySelector<HTMLInputElement>("#import-file")!;
 
   let db: DB | null = null;
 
   function log(msg: string) {
     status.textContent = msg;
+  }
+
+  function updateExportButton() {
+    exportBtn.disabled = !db || db.size === 0;
   }
 
   // Generate dataset
@@ -82,6 +96,7 @@ async function main() {
 
     log(`Indexed ${db.size} records in ${elapsed} ms`);
     resultsDiv.innerHTML = "";
+    updateExportButton();
   });
 
   // Search
@@ -110,6 +125,61 @@ async function main() {
     }
     html += "</tbody></table>";
     resultsDiv.innerHTML = html;
+  });
+
+  // Export — download the database as a .bin file
+  exportBtn.addEventListener("click", async () => {
+    if (!db || db.size === 0) {
+      log("No data to export.");
+      return;
+    }
+
+    log("Exporting…");
+    try {
+      const stream = await db.export();
+      const response = new Response(stream, {
+        headers: { "Content-Type": EIGEN_DB_MIME },
+      });
+      const blob = await response.blob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "database.bin";
+      a.click();
+      URL.revokeObjectURL(url);
+
+      log(`Exported ${db.size} records.`);
+    } catch (err) {
+      log(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+
+  // Import — upload a .bin file to replace the database
+  importFile.addEventListener("change", async () => {
+    const file = importFile.files?.[0];
+    if (!file) return;
+
+    log(`Importing ${file.name}…`);
+    try {
+      if (!db) {
+        db = await DB.open({
+          dimensions: DIMENSIONS,
+          storage: new InMemoryStorageProvider(),
+        });
+      }
+
+      await db.import(file.stream());
+
+      log(`Imported ${db.size} records from ${file.name}.`);
+      resultsDiv.innerHTML = "";
+      updateExportButton();
+    } catch (err) {
+      log(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    // Reset file input so same file can be re-imported
+    importFile.value = "";
   });
 
   log("Ready. Generate a dataset to begin.");

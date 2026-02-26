@@ -16,6 +16,51 @@ function getWasmBinary(): Promise<Uint8Array> {
   return wasmBinaryPromise;
 }
 
+/** Collect a ReadableStream into a single Uint8Array. */
+async function streamToBytes(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+  const chunks: Uint8Array[] = [];
+  const reader = stream.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const totalSize = chunks.reduce((sum, c) => sum + c.byteLength, 0);
+  const result = new Uint8Array(totalSize);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
+/** Create a ReadableStream from a Uint8Array (single chunk). */
+function bytesToStream(data: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(data);
+      controller.close();
+    },
+  });
+}
+
+/** Create a ReadableStream from a Uint8Array, delivering it in small chunks. */
+function bytesToChunkedStream(data: Uint8Array, chunkSize: number): ReadableStream<Uint8Array> {
+  let offset = 0;
+  return new ReadableStream({
+    pull(controller) {
+      if (offset >= data.byteLength) {
+        controller.close();
+        return;
+      }
+      const end = Math.min(offset + chunkSize, data.byteLength);
+      controller.enqueue(data.subarray(offset, end));
+      offset = end;
+    },
+  });
+}
+
 describe("VectorDB", () => {
   let storage: InMemoryStorageProvider;
 
@@ -490,6 +535,334 @@ describe("VectorDB", () => {
       db.set("a", [3, 0, 0, 0], { normalize: true });
       const result = db.get("a");
       expect(result![0]).toBeCloseTo(1.0);
+    });
+
+    // --- export and import (streaming) ---
+    it("export returns a readable stream of the database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 2, 3, 4]);
+      db.set("b", [5, 6, 7, 8]);
+
+      const stream = await db.export();
+      expect(stream).toBeInstanceOf(ReadableStream);
+
+      const bytes = await streamToBytes(stream);
+      expect(bytes.byteLength).toBeGreaterThan(0);
+    });
+
+    it("export of empty database returns a valid stream", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      const stream = await db.export();
+      const bytes = await streamToBytes(stream);
+      expect(bytes.byteLength).toBeGreaterThan(0);
+    });
+
+    it("import restores data from an exported stream", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("alpha", [1, 0, 0, 0]);
+      db1.set("beta", [0, 1, 0, 0]);
+
+      const stream = await db1.export();
+
+      // Import into a fresh database
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.import(stream);
+      expect(db2.size).toBe(2);
+      expect(db2.get("alpha")![0]).toBeCloseTo(1);
+      expect(db2.get("beta")![1]).toBeCloseTo(1);
+    });
+
+    it("import overrides existing data", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const stream = await db1.export();
+
+      // Create db2 with different data
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.set("x", [0, 0, 0, 1]);
+      db2.set("y", [0, 0, 1, 0]);
+      expect(db2.size).toBe(2);
+
+      await db2.import(stream);
+      expect(db2.size).toBe(1);
+      expect(db2.get("a")![0]).toBeCloseTo(1);
+      expect(db2.get("x")).toBeUndefined();
+      expect(db2.get("y")).toBeUndefined();
+    });
+
+    it("import throws on dimension mismatch", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const bytes = await streamToBytes(await db1.export());
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 8,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await expect(db2.import(bytesToStream(bytes))).rejects.toThrow("dimension");
+    });
+
+    it("import of empty export clears the database", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      const stream = await db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.set("existing", [1, 0, 0, 0]);
+      await db2.import(stream);
+      expect(db2.size).toBe(0);
+    });
+
+    it("imported data is queryable", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("x-axis", [1, 0, 0, 0]);
+      db1.set("y-axis", [0, 1, 0, 0]);
+      db1.set("xy-axis", [1, 1, 0, 0]);
+
+      const stream = await db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.import(stream);
+
+      const results = db2.query([1, 0, 0, 0]);
+      expect(results.length).toBe(3);
+      expect(results[0].key).toBe("x-axis");
+      expect(results[0].similarity).toBeCloseTo(1.0, 2);
+    });
+
+    it("export and import preserve data after set operations on imported db", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const stream = await db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.import(stream);
+      db2.set("b", [0, 1, 0, 0]);
+
+      expect(db2.size).toBe(2);
+      expect(db2.get("a")![0]).toBeCloseTo(1);
+      expect(db2.get("b")![1]).toBeCloseTo(1);
+    });
+
+    it("export throws on closed database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      await db.close();
+      await expect(db.export()).rejects.toThrow("closed");
+    });
+
+    it("import throws on closed database", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      const stream = await db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.close();
+      await expect(db2.import(stream)).rejects.toThrow("closed");
+    });
+
+    it("import throws on invalid stream (bad magic)", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      const badBlob = new Uint8Array(24);
+      await expect(db.import(bytesToStream(badBlob))).rejects.toThrow();
+    });
+
+    it("import throws on stream too short for header", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      const tooShort = new Uint8Array(10);
+      await expect(db.import(bytesToStream(tooShort))).rejects.toThrow();
+    });
+
+    it("import throws on truncated stream body", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const bytes = await streamToBytes(await db1.export());
+
+      // Truncate the blob to have valid header but incomplete body
+      const truncated = bytes.slice(0, 25);
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await expect(db2.import(bytesToStream(truncated))).rejects.toThrow("unexpected end of stream");
+    });
+
+    it("import works correctly with chunked stream (small chunks)", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("alpha", [1, 0, 0, 0]);
+      db1.set("beta", [0, 1, 0, 0]);
+      db1.set("gamma", [0, 0, 1, 0]);
+
+      const bytes = await streamToBytes(await db1.export());
+
+      // Feed it back as a stream with tiny 7-byte chunks (crosses header/vector/key boundaries)
+      const chunkedStream = bytesToChunkedStream(bytes, 7);
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.import(chunkedStream);
+      expect(db2.size).toBe(3);
+      expect(db2.get("alpha")![0]).toBeCloseTo(1);
+      expect(db2.get("beta")![1]).toBeCloseTo(1);
+      expect(db2.get("gamma")![2]).toBeCloseTo(1);
+    });
+
+    it("import works correctly with single-byte stream chunks", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("k", [1, 2, 3, 4]);
+
+      const bytes = await streamToBytes(await db1.export());
+      const chunkedStream = bytesToChunkedStream(bytes, 1);
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.import(chunkedStream);
+      expect(db2.size).toBe(1);
+      expect(db2.get("k")![0]).toBeCloseTo(1);
+      expect(db2.get("k")![3]).toBeCloseTo(4);
     });
   }
 

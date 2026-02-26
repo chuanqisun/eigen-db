@@ -144,4 +144,12 @@ export class MemoryManager {
   reset(): void {
     this._vectorCount = 0;
   }
+
+  /**
+   * Set the vector count after bulk-loading data directly into the DB region.
+   * Use when writing raw bytes to the DB region externally (e.g., streaming import).
+   */
+  setVectorCount(count: number): void {
+    this._vectorCount = count;
+  }
 }
