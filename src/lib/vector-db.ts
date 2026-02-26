@@ -556,7 +556,7 @@ class StreamReader {
         remaining -= value.byteLength;
       } else {
         onChunk(value.subarray(0, remaining));
-        this.buffer = value.subarray(remaining);
+        this.buffer = value.slice(remaining);
         remaining = 0;
       }
     }
