@@ -1,3 +1,7 @@
+# v2.1.0
+
+Fixed: typescript error due to unused typing was included in the library
+
 # v2.0.0
 
 Changed: export name from `VectorDB` to `DB`
