@@ -259,6 +259,23 @@ new InMemoryStorageProvider();
 
 Thrown when memory growth would exceed WASM 32-bit memory limits for the configured dimension size.
 
+## Benchmark results
+
+WASM SIMD vs pure JavaScript performance on 1536-dimensional vectors (OpenAI embedding size), measured with `vitest bench`:
+
+| Operation | JS (ops/s) | WASM SIMD (ops/s) | Speedup |
+| --- | --- | --- | --- |
+| normalize (1536 dims) | 215,362 | 2,209,775 | **~10×** |
+| searchAll (100 vectors × 1536 dims) | 3,440 | 70,165 | **~20×** |
+| searchAll (1,000 vectors × 1536 dims) | 345 | 7,408 | **~21×** |
+| searchAll (10,000 vectors × 1536 dims) | 34 | 353 | **~10×** |
+
+The WASM SIMD layer uses 4× loop unrolling with multiple independent accumulators to maximize instruction-level parallelism. Run benchmarks locally with:
+
+```bash
+npm run bench
+```
+
 ## Practical notes
 
 - Distance is `1 - dotProduct`; with normalization enabled (default), this behaves like cosine distance (0 = identical, 2 = opposite).
