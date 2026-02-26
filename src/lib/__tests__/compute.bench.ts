@@ -30,11 +30,11 @@ describe("normalize benchmark", async () => {
   });
 });
 
-describe("searchAll benchmark", async () => {
-  const dimensions = 1536;
-  const dbSizes = [100, 1000, 10000];
+const dimensions = 1536;
+const dbSizes = [100, 1000, 10000];
 
-  for (const dbSize of dbSizes) {
+for (const dbSize of dbSizes) {
+  describe(`searchAll benchmark (${dbSize} vectors)`, async () => {
     // Prepare data
     const query = new Float32Array(dimensions);
     for (let i = 0; i < dimensions; i++) query[i] = Math.random();
@@ -66,5 +66,5 @@ describe("searchAll benchmark", async () => {
     bench(`WASM SIMD searchAll (${dbSize} vectors × ${dimensions} dims)`, () => {
       wasm.search_all(queryPtr, dbPtr, scoresPtr, dbSize, dimensions);
     });
-  }
-});
+  });
+}
