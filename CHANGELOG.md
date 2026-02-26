@@ -1,3 +1,7 @@
+# v4.0.2
+
+Fixed: `query()` overload type hint issue
+
 # v4.0.1
 
 Fixed: the source code was stale
