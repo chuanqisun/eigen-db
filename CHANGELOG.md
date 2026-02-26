@@ -1,3 +1,7 @@
+# v4.2.0
+
+Added: import/export in binary format
+
 # v4.1.0
 
 Added: performance optimization in WASM
