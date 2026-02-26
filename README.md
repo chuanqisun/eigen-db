@@ -98,23 +98,37 @@ await db.clear();
 
 ### 5) Export and import
 
-Export the entire database to a single binary blob:
+Export the entire database as a streaming binary file:
 
 ```ts
-const blob = db.export(); // Uint8Array
+const stream = await db.export(); // ReadableStream<Uint8Array>
+
+// In a browser — download as a file
+const response = new Response(stream);
+const blob = await response.blob();
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+a.href = url;
+a.download = "database.bin";
+a.click();
 ```
 
-Import a blob into a database, replacing all existing data:
+Import from a stream, replacing all existing data:
 
 ```ts
-db.import(blob);
+// From a File (e.g., <input type="file">)
+await db.import(file.stream());
+
+// From a fetch response
+const res = await fetch("/path/to/database.bin");
+await db.import(res.body!);
 ```
 
 Notes:
 
 - `import()` replaces all existing data in the target database.
-- A dimension check is performed on import: the blob must have been exported from a database with the same `dimensions` setting.
-- The blob is a self-contained binary file that combines vectors and keys.
+- A dimension check is performed on import: the stream must contain data exported from a database with the same `dimensions` setting.
+- Both methods use the Web Streams API to avoid large heap allocations — vectors are streamed in 64KB chunks.
 
 ## Similarity metric
 
@@ -184,11 +198,11 @@ Opens (or creates) a database instance and loads persisted data.
   - Subsequent operations throw.
 - `clear(): Promise<void>`
   - Clears in-memory state and destroys storage for this DB.
-- `export(): Uint8Array`
-  - Exports the entire database as a single binary blob.
-- `import(blob: Uint8Array): void`
-  - Imports data from a binary blob, replacing all existing data.
-  - Throws on dimension mismatch between the blob and the database.
+- `export(): Promise<ReadableStream<Uint8Array>>`
+  - Exports the entire database as a streaming binary. Vectors are streamed in 64KB chunks.
+- `import(stream: ReadableStream<Uint8Array>): Promise<void>`
+  - Imports data from a stream, replacing all existing data.
+  - Throws on dimension mismatch between the stream data and the database.
 
 ### `ResultItem`
 
