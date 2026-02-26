@@ -871,4 +871,44 @@ describe("VectorDB", () => {
     expect(err).toBeInstanceOf(VectorCapacityExceededError);
     expect(err.message).toContain("100");
   });
+
+  // --- storage decoupling ---
+  it("defaults to in-memory storage when no storage is provided", async () => {
+    const db = await VectorDB.open({
+      dimensions: 4,
+      wasmBinary: null,
+    });
+
+    db.set("a", [1, 0, 0, 0]);
+    expect(db.size).toBe(1);
+    expect(db.get("a")).toBeDefined();
+
+    // Flush should succeed with default in-memory storage
+    await db.flush();
+    await db.close();
+  });
+
+  it("accepts an explicit storage provider via options", async () => {
+    const customStorage = new InMemoryStorageProvider();
+    const db = await VectorDB.open({
+      dimensions: 4,
+      normalize: false,
+      storage: customStorage,
+      wasmBinary: null,
+    });
+
+    db.set("key1", [1, 2, 3, 4]);
+    await db.flush();
+
+    // Reopen with the same storage to verify persistence
+    const db2 = await VectorDB.open({
+      dimensions: 4,
+      normalize: false,
+      storage: customStorage,
+      wasmBinary: null,
+    });
+
+    expect(db2.size).toBe(1);
+    expect(db2.get("key1")![0]).toBeCloseTo(1);
+  });
 });

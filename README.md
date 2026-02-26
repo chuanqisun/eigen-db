@@ -4,7 +4,7 @@ High-performance vector database for the web.
 
 `eigen-db` stores and queries embedding vectors in-browser, using:
 
-- OPFS (Origin Private File System) for persistence
+- Pluggable storage backends (in-memory by default, OPFS for browser persistence)
 - WASM SIMD for fast compute when available
 - JavaScript fallback when WASM SIMD is unavailable
 
@@ -21,10 +21,21 @@ npm install eigen-db
 ```ts
 import { DB } from "eigen-db";
 
+// In-memory (default) — no persistence, great for ephemeral sessions
 const db = await DB.open({
-  name: "my-index", // optional, defaults to "default"
   dimensions: 1536, // required
   normalize: true, // optional, defaults to true
+});
+```
+
+For browser persistence, mount an OPFS storage backend:
+
+```ts
+import { DB, OPFSStorageProvider } from "eigen-db";
+
+const db = await DB.open({
+  dimensions: 1536,
+  storage: new OPFSStorageProvider("my-index"), // persistent OPFS directory
 });
 ```
 
@@ -221,9 +232,9 @@ interface ResultItem {
 
 ```ts
 interface OpenOptions {
-  name?: string; // OPFS directory name, default: "default"
   dimensions: number; // vector size
   normalize?: boolean; // default: true
+  storage?: StorageProvider; // default: InMemoryStorageProvider
 }
 ```
 
@@ -233,12 +244,10 @@ Advanced/testing override options.
 
 ```ts
 interface OpenOptionsInternal extends OpenOptions {
-  storage?: StorageProvider;
   wasmBinary?: Uint8Array | null;
 }
 ```
 
-- `storage`: provide custom storage implementation (for example, tests)
 - `wasmBinary`:
   - `Uint8Array`: use provided precompiled WASM
   - `null`: force JavaScript-only compute

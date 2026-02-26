@@ -1,7 +1,8 @@
-import { DB, InMemoryStorageProvider } from "./lib/index";
+import { DB, OPFSStorageProvider } from "./lib/index";
 import "./style.css";
 
 const DIMENSIONS = 128;
+const DB_DIR = "eigen-db-demo";
 
 /** Simple character-frequency embedder for demo purposes */
 function embed(text: string): number[] {
@@ -50,6 +51,12 @@ async function main() {
       <label>Import: <input id="import-file" type="file" accept=".bin" /></label>
     </fieldset>
 
+    <fieldset>
+      <legend>Persistent storage (OPFS)</legend>
+      <button id="load-btn">Load existing DB</button>
+      <button id="delete-btn">Delete DB</button>
+    </fieldset>
+
     <div id="status">Initializing…</div>
     <div id="results"></div>
   `;
@@ -58,8 +65,29 @@ async function main() {
   const resultsDiv = document.querySelector<HTMLDivElement>("#results")!;
   const exportBtn = document.querySelector<HTMLButtonElement>("#export-btn")!;
   const importFile = document.querySelector<HTMLInputElement>("#import-file")!;
+  const loadBtn = document.querySelector<HTMLButtonElement>("#load-btn")!;
+  const deleteBtn = document.querySelector<HTMLButtonElement>("#delete-btn")!;
 
   let db: DB | null = null;
+
+  function supportsOPFS(): boolean {
+    return typeof navigator !== "undefined" && !!navigator.storage?.getDirectory;
+  }
+
+  function createStorage() {
+    return new OPFSStorageProvider(DB_DIR);
+  }
+
+  async function openDbWithTimer(reason: string): Promise<void> {
+    const start = performance.now();
+    db = await DB.open({
+      dimensions: DIMENSIONS,
+      storage: createStorage(),
+    });
+    const elapsed = (performance.now() - start).toFixed(1);
+    log(`${reason}: loaded ${db.size} records in ${elapsed} ms`);
+    updateExportButton();
+  }
 
   function log(msg: string) {
     status.textContent = msg;
@@ -68,6 +96,18 @@ async function main() {
   function updateExportButton() {
     exportBtn.disabled = !db || db.size === 0;
   }
+
+  if (!supportsOPFS()) {
+    const msg = "OPFS is not supported in this browser context (requires secure context).";
+    log(msg);
+    loadBtn.disabled = true;
+    deleteBtn.disabled = true;
+    exportBtn.disabled = true;
+    return;
+  }
+
+  // Load any existing persisted DB on startup
+  await openDbWithTimer("Startup");
 
   // Generate dataset
   document.querySelector("#gen-btn")!.addEventListener("click", async () => {
@@ -89,12 +129,13 @@ async function main() {
     const start = performance.now();
     db = await DB.open({
       dimensions: DIMENSIONS,
-      storage: new InMemoryStorageProvider(),
+      storage: createStorage(),
     });
     db.setMany(entries);
+    await db.flush();
     const elapsed = (performance.now() - start).toFixed(1);
 
-    log(`Indexed ${db.size} records in ${elapsed} ms`);
+    log(`Indexed and flushed ${db.size} records in ${elapsed} ms`);
     resultsDiv.innerHTML = "";
     updateExportButton();
   });
@@ -165,13 +206,15 @@ async function main() {
       if (!db) {
         db = await DB.open({
           dimensions: DIMENSIONS,
-          storage: new InMemoryStorageProvider(),
+          storage: createStorage(),
         });
       }
 
+      const start = performance.now();
       await db.import(file.stream());
+      const elapsed = (performance.now() - start).toFixed(1);
 
-      log(`Imported ${db.size} records from ${file.name}.`);
+      log(`Imported ${db.size} records from ${file.name} in ${elapsed} ms.`);
       resultsDiv.innerHTML = "";
       updateExportButton();
     } catch (err) {
@@ -182,7 +225,44 @@ async function main() {
     importFile.value = "";
   });
 
-  log("Ready. Generate a dataset to begin.");
+  // Load persisted DB on demand
+  loadBtn.addEventListener("click", async () => {
+    log("Loading from OPFS…");
+    try {
+      await openDbWithTimer("Load");
+      resultsDiv.innerHTML = "";
+    } catch (err) {
+      log(`Load failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+
+  // Delete persisted DB and clear active state
+  deleteBtn.addEventListener("click", async () => {
+    log("Deleting DB from OPFS…");
+    try {
+      const start = performance.now();
+      if (!db) {
+        db = await DB.open({
+          dimensions: DIMENSIONS,
+          storage: createStorage(),
+        });
+      }
+      await db.clear();
+      db = await DB.open({
+        dimensions: DIMENSIONS,
+        storage: createStorage(),
+      });
+      const elapsed = (performance.now() - start).toFixed(1);
+
+      resultsDiv.innerHTML = "";
+      updateExportButton();
+      log(`Deleted DB and reinitialized empty store in ${elapsed} ms.`);
+    } catch (err) {
+      log(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+
+  log("Ready. OPFS-backed DB is loaded.");
 }
 
 main();

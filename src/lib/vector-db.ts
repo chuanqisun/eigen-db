@@ -20,7 +20,7 @@ import type { ResultItem } from "./result-set";
 import { iterableResults, topKResults } from "./result-set";
 import { getSimdWasmBinary } from "./simd-binary";
 import type { StorageProvider } from "./storage";
-import { OPFSStorageProvider } from "./storage";
+import { InMemoryStorageProvider } from "./storage";
 import type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
 import { instantiateWasm, type WasmExports } from "./wasm-compute";
 
@@ -76,8 +76,7 @@ export class VectorDB {
   static async open(options: OpenOptions): Promise<VectorDB>;
   static async open(options: OpenOptionsInternal): Promise<VectorDB>;
   static async open(options: OpenOptionsInternal): Promise<VectorDB> {
-    const name = options.name ?? "default";
-    const storage = options.storage ?? new OPFSStorageProvider(name);
+    const storage = options.storage ?? new InMemoryStorageProvider();
     const shouldNormalize = options.normalize !== false;
 
     // Load existing data from storage
