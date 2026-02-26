@@ -261,19 +261,30 @@ Thrown when memory growth would exceed WASM 32-bit memory limits for the configu
 
 ## Benchmark results
 
-WASM SIMD vs pure JavaScript performance on 1536-dimensional vectors (OpenAI embedding size), measured with `vitest bench`:
+WASM SIMD vs pure JavaScript performance on 1536-dimensional vectors (OpenAI embedding size), measured with `vitest bench` (Node.js):
 
 | Operation | JS (ops/s) | WASM SIMD (ops/s) | Speedup |
 | --- | --- | --- | --- |
-| normalize (1536 dims) | 215,362 | 2,209,775 | **~10×** |
-| searchAll (100 vectors × 1536 dims) | 3,440 | 70,165 | **~20×** |
-| searchAll (1,000 vectors × 1536 dims) | 345 | 7,408 | **~21×** |
-| searchAll (10,000 vectors × 1536 dims) | 34 | 353 | **~10×** |
+| normalize (1536 dims) | 223,117 | 2,226,734 | **~10×** |
+| searchAll (100 vectors × 1536 dims) | 3,429 | 77,130 | **~22×** |
+| searchAll (1,000 vectors × 1536 dims) | 344 | 8,009 | **~23×** |
+| searchAll (10,000 vectors × 1536 dims) | 34 | 398 | **~12×** |
 
-The WASM SIMD layer uses 4× loop unrolling with multiple independent accumulators to maximize instruction-level parallelism. Run benchmarks locally with:
+The WASM SIMD layer uses 2-vector outer loop unrolling (halving query memory reads) and 4× inner loop unrolling with multiple independent accumulators.
+
+### Running benchmarks
+
+**Node.js** (via vitest):
 
 ```bash
 npm run bench
+```
+
+**Browser**: start the dev server and navigate to the benchmark page:
+
+```bash
+npm run dev
+# Open http://localhost:5173/bench.html
 ```
 
 ## Practical notes

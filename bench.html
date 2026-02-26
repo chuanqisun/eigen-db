@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Eigen DB — WASM SIMD Benchmark</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 900px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a1a1a;
+        background: #fafafa;
+      }
+      h1 {
+        margin-bottom: 0.25rem;
+      }
+      .subtitle {
+        color: #666;
+        margin-top: 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+      }
+      th,
+      td {
+        padding: 0.5rem 0.75rem;
+        text-align: right;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      th {
+        background: #f0f0f0;
+        font-weight: 600;
+      }
+      td:first-child,
+      th:first-child {
+        text-align: left;
+      }
+      .speedup {
+        font-weight: 700;
+        color: #1a7f37;
+      }
+      button {
+        padding: 0.5rem 1.5rem;
+        font-size: 1rem;
+        cursor: pointer;
+        background: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 4px;
+      }
+      button:disabled {
+        background: #94a3b8;
+        cursor: wait;
+      }
+      #status {
+        margin: 1rem 0;
+        font-style: italic;
+        color: #555;
+      }
+      .env-info {
+        font-size: 0.85rem;
+        color: #888;
+        margin-top: 2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>⚡ Eigen DB — WASM SIMD Benchmark</h1>
+    <p class="subtitle">
+      Compares pure JavaScript vs WASM SIMD vector operations (1536 dimensions, OpenAI embedding
+      size)
+    </p>
+
+    <button id="run-btn">Run Benchmark</button>
+    <div id="status"></div>
+    <div id="results"></div>
+    <div class="env-info" id="env-info"></div>
+
+    <script type="module" src="/src/bench.ts"></script>
+  </body>
+</html>
