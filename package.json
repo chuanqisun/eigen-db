@@ -4,7 +4,9 @@
   "type": "module",
   "files": [
     "dist",
-    "src/lib"
+    "src/lib",
+    "CHANGELOG.md",
+    "README.md"
   ],
   "main": "./dist/",
   "scripts": {
