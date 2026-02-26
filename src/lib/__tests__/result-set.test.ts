@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { topKResults, iterableResults } from "../result-set";
+import { describe, expect, it } from "vitest";
+import { iterableResults, topKResults } from "../result-set";
 
 describe("topKResults", () => {
   const keys = ["apple", "banana", "cherry", "date", "elderberry"];

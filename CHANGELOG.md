@@ -1,3 +1,7 @@
+# v4.0.0
+
+Changed: `query()` returns simple iterable
+
 # v3.0.0
 
 Changed: Input vectors should be of type `number[]`, not `Float32Array`.

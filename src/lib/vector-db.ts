@@ -20,7 +20,14 @@ import { iterableResults, topKResults } from "./result-set";
 import { getSimdWasmBinary } from "./simd-binary";
 import type { StorageProvider } from "./storage";
 import { OPFSStorageProvider } from "./storage";
-import type { IterableQueryOptions, OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
+import type {
+  IterableQueryOptions,
+  OpenOptions,
+  OpenOptionsInternal,
+  QueryOptions,
+  SetOptions,
+  VectorInput,
+} from "./types";
 import { instantiateWasm, type WasmExports } from "./wasm-compute";
 
 const VECTORS_FILE = "vectors.bin";

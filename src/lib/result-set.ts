@@ -19,11 +19,7 @@ export type KeyResolver = (index: number) => string;
  * Sort scores descending and return the top K results as a plain array.
  * All keys are resolved eagerly.
  */
-export function topKResults(
-  scores: Float32Array,
-  resolveKey: KeyResolver,
-  topK: number,
-): ResultItem[] {
+export function topKResults(scores: Float32Array, resolveKey: KeyResolver, topK: number): ResultItem[] {
   const n = scores.length;
   if (n === 0) return [];
 
@@ -48,11 +44,7 @@ export function topKResults(
  * The returned iterable is re-iterable — each call to [Symbol.iterator]()
  * produces a fresh cursor over the same pre-sorted data.
  */
-export function iterableResults(
-  scores: Float32Array,
-  resolveKey: KeyResolver,
-  topK: number,
-): Iterable<ResultItem> {
+export function iterableResults(scores: Float32Array, resolveKey: KeyResolver, topK: number): Iterable<ResultItem> {
   const n = scores.length;
   if (n === 0) return [];
 
