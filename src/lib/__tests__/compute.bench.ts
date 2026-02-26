@@ -2,7 +2,8 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { bench, describe } from "vitest";
 import { normalize as jsNormalize, searchAll as jsSearchAll } from "../compute";
-import { compileWatToWasm, instantiateWasm } from "../wasm-compute";
+import { instantiateWasm } from "../wasm-compute";
+import { compileWatToWasm } from "./compile-wat-helper";
 
 const watSource = readFileSync(resolve(__dirname, "../simd.wat"), "utf-8");
 

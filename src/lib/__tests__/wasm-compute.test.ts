@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { compileWatToWasm, instantiateWasm, type WasmExports } from "../wasm-compute";
+import { beforeAll, describe, expect, it } from "vitest";
+import { instantiateWasm, type WasmExports } from "../wasm-compute";
+import { compileWatToWasm } from "./compile-wat-helper";
 
 describe("WASM SIMD compute", () => {
   let memory: WebAssembly.Memory;
@@ -73,8 +74,14 @@ describe("WASM SIMD compute", () => {
 
       const query = new Float32Array([1, 0, 0, 0]);
       const db = new Float32Array([
-        1, 0, 0, 0, // identical to query
-        0, 1, 0, 0, // orthogonal
+        1,
+        0,
+        0,
+        0, // identical to query
+        0,
+        1,
+        0,
+        0, // orthogonal
       ]);
 
       writeFloat32Array(queryPtr, query);

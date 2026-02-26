@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { VectorDB } from "../vector-db";
-import { InMemoryStorageProvider } from "../storage";
+import { beforeEach, describe, expect, it } from "vitest";
 import { VectorCapacityExceededError } from "../errors";
-import { compileWatToWasm } from "../wasm-compute";
+import { InMemoryStorageProvider } from "../storage";
+import { VectorDB } from "../vector-db";
+import { compileWatToWasm } from "./compile-wat-helper";
 
 const watSource = readFileSync(resolve(__dirname, "../simd.wat"), "utf-8");
 
