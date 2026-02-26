@@ -180,17 +180,17 @@ describe("VectorDB", () => {
       const results = db.query([1, 0, 0, 0]);
       expect(results.length).toBe(3);
 
-      // x-axis should be the best match (identical direction)
+      // x-axis should be the best match (identical direction, distance ≈ 0)
       expect(results[0].key).toBe("x-axis");
-      expect(results[0].score).toBeCloseTo(1.0, 2);
+      expect(results[0].distance).toBeCloseTo(0.0, 2);
 
       // xy-axis should be second (partially aligned)
       expect(results[1].key).toBe("xy-axis");
-      expect(results[1].score).toBeGreaterThan(0);
+      expect(results[1].distance).toBeLessThan(1);
 
-      // y-axis should be last (orthogonal)
+      // y-axis should be last (orthogonal, distance ≈ 1)
       expect(results[2].key).toBe("y-axis");
-      expect(results[2].score).toBeCloseTo(0.0, 2);
+      expect(results[2].distance).toBeCloseTo(1.0, 2);
     });
 
     it("query respects topK option", async () => {
@@ -251,7 +251,7 @@ describe("VectorDB", () => {
       expect(all).toHaveLength(5);
 
       // Partial iteration (simulate pagination)
-      const page: { key: string; score: number }[] = [];
+      const page: { key: string; distance: number }[] = [];
       for (const item of results) {
         page.push(item);
         if (page.length === 2) break;
@@ -273,10 +273,65 @@ describe("VectorDB", () => {
       db.set("point", [0, 1, 0, 0]);
 
       const results = db.query([0, 1, 0, 0]);
-      // Both 'point' and 'other' are now along y-axis, so both should score high
-      expect(results[0].score).toBeCloseTo(1.0, 2);
-      expect(results[1].score).toBeCloseTo(1.0, 2);
+      // Both 'point' and 'other' are now along y-axis, so both should have distance ≈ 0
+      expect(results[0].distance).toBeCloseTo(0.0, 2);
+      expect(results[1].distance).toBeCloseTo(0.0, 2);
       expect(db.size).toBe(2);
+    });
+
+    it("query respects maxDistance option", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      // Only return results with distance ≤ 0.5 from the x-axis query
+      const results = db.query([1, 0, 0, 0], { maxDistance: 0.5 });
+      // x-axis: distance ≈ 0, xy-axis: distance ≈ 0.29
+      // y-axis: distance ≈ 1 (excluded)
+      expect(results.length).toBe(2);
+      expect(results[0].key).toBe("x-axis");
+      expect(results[1].key).toBe("xy-axis");
+    });
+
+    it("query maxDistance works with iterable mode", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      const results = [...db.query([1, 0, 0, 0], { maxDistance: 0.5, iterable: true })];
+      expect(results.length).toBe(2);
+      expect(results[0].key).toBe("x-axis");
+      expect(results[1].key).toBe("xy-axis");
+    });
+
+    it("query topK defaults to Infinity (returns all results)", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      for (let i = 0; i < 10; i++) {
+        const vec = [0, 0, 0, 0];
+        vec[i % 4] = 1;
+        db.set(`v${i}`, vec);
+      }
+
+      // Without topK, all 10 results should be returned
+      const results = db.query([1, 0, 0, 0]);
+      expect(results.length).toBe(10);
     });
 
     // --- flush and persistence ---
