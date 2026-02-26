@@ -1,3 +1,7 @@
+# v2.1.1
+
+Fixed: package.json issues
+
 # v2.1.0
 
 Fixed: typescript error due to unused typing was included in the library
