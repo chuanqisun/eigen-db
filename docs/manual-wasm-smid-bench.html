@@ -2,11 +2,11 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>SIMD Cosine Distance Benchmark</title>
+    <title>SIMD Cosine Similarity Benchmark</title>
     <script src="https://unpkg.com/wabt@1.0.32/index.js"></script>
   </head>
   <body>
-    <h1>SIMD Cosine Distance Benchmark</h1>
+    <h1>SIMD Cosine Similarity Benchmark</h1>
 
     <div>
       <label>Vector Dimensions: <input type="number" id="dims" value="256" min="4" step="4" /></label>
@@ -27,11 +27,11 @@
 (module
   (memory (export "mem") 100)
 
-  ;; cosine_distance(ptrA, ptrB, dims) -> f32
+  ;; cosine_similarity(ptrA, ptrB, dims) -> f32
   ;; ptrA: byte offset to vector A (f32 array)
   ;; ptrB: byte offset to vector B (f32 array)
   ;; dims: number of dimensions
-  (func (export "cosine_distance") (param $pA i32) (param $pB i32) (param $dims i32) (result f32)
+  (func (export "cosine_similarity") (param $pA i32) (param $pB i32) (param $dims i32) (result f32)
     (local $i i32)
     (local $dot f32)
     (local $normA f32)
@@ -61,14 +61,14 @@
       )
     )
 
-    ;; cosine_distance = 1 - dot / sqrt(normA * normB)
+    ;; cosine_similarity = dot / sqrt(normA * normB)
     (local.set $sim
       (f32.div
         (local.get $dot)
         (f32.sqrt (f32.mul (local.get $normA) (local.get $normB)))
       )
     )
-    (f32.sub (f32.const 1) (local.get $sim))
+    (local.get $sim)
   )
 )
 `;
@@ -77,9 +77,9 @@
 (module
   (memory (export "mem") 100)
 
-  ;; cosine_distance_simd(ptrA, ptrB, dims) -> f32
+  ;; cosine_similarity_simd(ptrA, ptrB, dims) -> f32
   ;; Processes 4 f32 lanes at a time using v128 SIMD
-  (func (export "cosine_distance") (param $pA i32) (param $pB i32) (param $dims i32) (result f32)
+  (func (export "cosine_similarity") (param $pA i32) (param $pB i32) (param $dims i32) (result f32)
     (local $i i32)
     (local $dot v128)
     (local $normA v128)
@@ -158,19 +158,19 @@
       )
     )
 
-    ;; cosine_distance = 1 - dot / sqrt(normA * normB)
+    ;; cosine_similarity = dot / sqrt(normA * normB)
     (local.set $sim
       (f32.div
         (local.get $dotScalar)
         (f32.sqrt (f32.mul (local.get $normAScalar) (local.get $normBScalar)))
       )
     )
-    (f32.sub (f32.const 1) (local.get $sim))
+    (local.get $sim)
   )
 )
 `;
 
-      function jsCosineDistance(a, b) {
+      function jsCosineSimilarity(a, b) {
         let dot = 0,
           normA = 0,
           normB = 0;
@@ -179,7 +179,7 @@
           normA += a[i] * a[i];
           normB += b[i] * b[i];
         }
-        return 1 - dot / Math.sqrt(normA * normB);
+        return dot / Math.sqrt(normA * normB);
       }
 
       async function compileWat(wabtModule, watSource, enableSimd) {
@@ -225,7 +225,7 @@
         }
 
         output.textContent = "";
-        log(`Benchmark: Cosine Distance`);
+        log(`Benchmark: Cosine Similarity`);
         log(`Dimensions: ${dims}, Iterations: ${iterations}, Runs: ${numRuns}`);
         log(`Compiling WAT modules...`);
 
@@ -272,9 +272,9 @@
         copyVectorsToMemory(simdInstance.exports.mem, ptrA, ptrB, vecA, vecB);
 
         // Verify correctness
-        const jsResult = jsCosineDistance(vecA, vecB);
-        const scalarResult = scalarInstance.exports.cosine_distance(ptrA, ptrB, dims);
-        const simdResult = simdInstance.exports.cosine_distance(ptrA, ptrB, dims);
+        const jsResult = jsCosineSimilarity(vecA, vecB);
+        const scalarResult = scalarInstance.exports.cosine_similarity(ptrA, ptrB, dims);
+        const simdResult = simdInstance.exports.cosine_similarity(ptrA, ptrB, dims);
 
         log("");
         log(`--- Correctness Check ---`);
@@ -287,9 +287,9 @@
         log("");
         log("Warming up...");
         for (let i = 0; i < 1000; i++) {
-          jsCosineDistance(vecA, vecB);
-          scalarInstance.exports.cosine_distance(ptrA, ptrB, dims);
-          simdInstance.exports.cosine_distance(ptrA, ptrB, dims);
+          jsCosineSimilarity(vecA, vecB);
+          scalarInstance.exports.cosine_similarity(ptrA, ptrB, dims);
+          simdInstance.exports.cosine_similarity(ptrA, ptrB, dims);
         }
 
         log("");
@@ -305,7 +305,7 @@
           let t0 = performance.now();
           let sink = 0;
           for (let i = 0; i < iterations; i++) {
-            sink += jsCosineDistance(vecA, vecB);
+            sink += jsCosineSimilarity(vecA, vecB);
           }
           let t1 = performance.now();
           const jsTime = t1 - t0;
@@ -315,7 +315,7 @@
           t0 = performance.now();
           sink = 0;
           for (let i = 0; i < iterations; i++) {
-            sink += scalarInstance.exports.cosine_distance(ptrA, ptrB, dims);
+            sink += scalarInstance.exports.cosine_similarity(ptrA, ptrB, dims);
           }
           t1 = performance.now();
           const scalarTime = t1 - t0;
@@ -325,7 +325,7 @@
           t0 = performance.now();
           sink = 0;
           for (let i = 0; i < iterations; i++) {
-            sink += simdInstance.exports.cosine_distance(ptrA, ptrB, dims);
+            sink += simdInstance.exports.cosine_similarity(ptrA, ptrB, dims);
           }
           t1 = performance.now();
           const simdTime = t1 - t0;
