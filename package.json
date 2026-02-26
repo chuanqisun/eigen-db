@@ -8,7 +8,14 @@
     "CHANGELOG.md",
     "README.md"
   ],
-  "main": "./dist/",
+  "main": "./dist/eigen-db.umd.cjs",
+  "module": "./dist/eigen-db.js",
+  "exports": {
+    ".": {
+      "import": "./dist/eigen-db.js",
+      "require": "./dist/eigen-db.umd.cjs"
+    }
+  },
   "types": "./src/lib/index.ts",
   "scripts": {
     "dev": "vite",
