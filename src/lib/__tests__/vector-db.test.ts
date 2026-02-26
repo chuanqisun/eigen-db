@@ -491,6 +491,246 @@ describe("VectorDB", () => {
       const result = db.get("a");
       expect(result![0]).toBeCloseTo(1.0);
     });
+
+    // --- export and import ---
+    it("export returns a binary blob of the database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 2, 3, 4]);
+      db.set("b", [5, 6, 7, 8]);
+
+      const blob = db.export();
+      expect(blob).toBeInstanceOf(Uint8Array);
+      expect(blob.byteLength).toBeGreaterThan(0);
+    });
+
+    it("export of empty database returns a valid blob", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      const blob = db.export();
+      expect(blob).toBeInstanceOf(Uint8Array);
+      expect(blob.byteLength).toBeGreaterThan(0);
+    });
+
+    it("import restores data from an exported blob", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("alpha", [1, 0, 0, 0]);
+      db1.set("beta", [0, 1, 0, 0]);
+      const blob = db1.export();
+
+      // Import into a fresh database
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.import(blob);
+      expect(db2.size).toBe(2);
+      expect(db2.get("alpha")![0]).toBeCloseTo(1);
+      expect(db2.get("beta")![1]).toBeCloseTo(1);
+    });
+
+    it("import overrides existing data", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const blob = db1.export();
+
+      // Create db2 with different data
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.set("x", [0, 0, 0, 1]);
+      db2.set("y", [0, 0, 1, 0]);
+      expect(db2.size).toBe(2);
+
+      db2.import(blob);
+      expect(db2.size).toBe(1);
+      expect(db2.get("a")![0]).toBeCloseTo(1);
+      expect(db2.get("x")).toBeUndefined();
+      expect(db2.get("y")).toBeUndefined();
+    });
+
+    it("import throws on dimension mismatch", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const blob = db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 8,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      expect(() => db2.import(blob)).toThrow("dimension");
+    });
+
+    it("import of empty export clears the database", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      const blob = db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.set("existing", [1, 0, 0, 0]);
+      db2.import(blob);
+      expect(db2.size).toBe(0);
+    });
+
+    it("imported data is queryable", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("x-axis", [1, 0, 0, 0]);
+      db1.set("y-axis", [0, 1, 0, 0]);
+      db1.set("xy-axis", [1, 1, 0, 0]);
+      const blob = db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.import(blob);
+
+      const results = db2.query([1, 0, 0, 0]);
+      expect(results.length).toBe(3);
+      expect(results[0].key).toBe("x-axis");
+      expect(results[0].similarity).toBeCloseTo(1.0, 2);
+    });
+
+    it("export and import preserve data after set operations on imported db", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const blob = db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      db2.import(blob);
+      db2.set("b", [0, 1, 0, 0]);
+
+      expect(db2.size).toBe(2);
+      expect(db2.get("a")![0]).toBeCloseTo(1);
+      expect(db2.get("b")![1]).toBeCloseTo(1);
+    });
+
+    it("export throws on closed database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      await db.close();
+      expect(() => db.export()).toThrow("closed");
+    });
+
+    it("import throws on closed database", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      const blob = db1.export();
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      await db2.close();
+      expect(() => db2.import(blob)).toThrow("closed");
+    });
+
+    it("import throws on invalid blob (bad magic)", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      const badBlob = new Uint8Array(24);
+      expect(() => db.import(badBlob)).toThrow();
+    });
+
+    it("import throws on blob too short for header", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      const tooShort = new Uint8Array(10);
+      expect(() => db.import(tooShort)).toThrow();
+    });
   }
 
   it("throws VectorCapacityExceededError when full", async () => {

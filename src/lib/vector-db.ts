@@ -26,6 +26,11 @@ import { instantiateWasm, type WasmExports } from "./wasm-compute";
 const VECTORS_FILE = "vectors.bin";
 const KEYS_FILE = "keys.bin";
 
+/** Binary export format magic bytes: "EGDB" */
+const EXPORT_MAGIC = 0x42444745; // "EGDB" in little-endian
+const EXPORT_VERSION = 1;
+const EXPORT_HEADER_BYTES = 24;
+
 export class VectorDB {
   private readonly memoryManager: MemoryManager;
   private readonly storage: StorageProvider;
@@ -312,6 +317,114 @@ export class VectorDB {
     this.memoryManager.reset();
 
     await this.storage.destroy();
+  }
+
+  /**
+   * Export the entire database as a single binary blob.
+   *
+   * Format: [Header 24 bytes][Vector data][Keys data]
+   * Header: magic(4) + version(4) + dimensions(4) + vectorCount(4) + vectorDataLen(4) + keysDataLen(4)
+   */
+  export(): Uint8Array {
+    this.assertOpen();
+
+    const totalVectors = this.memoryManager.vectorCount;
+
+    // Serialize vectors from memory
+    const vectorDataLen = totalVectors * this.dimensions * 4;
+    const vectorBytes = new Uint8Array(vectorDataLen);
+    if (totalVectors > 0) {
+      const src = new Uint8Array(
+        this.memoryManager.memory.buffer,
+        this.memoryManager.dbOffset,
+        vectorDataLen,
+      );
+      vectorBytes.set(src);
+    }
+
+    // Serialize keys
+    const keysBytes = encodeLexicon(this.slotToKey);
+    const keysDataLen = keysBytes.byteLength;
+
+    // Build the blob
+    const totalSize = EXPORT_HEADER_BYTES + vectorDataLen + keysDataLen;
+    const buffer = new ArrayBuffer(totalSize);
+    const view = new DataView(buffer);
+    const blob = new Uint8Array(buffer);
+
+    // Write header
+    view.setUint32(0, EXPORT_MAGIC, true);
+    view.setUint32(4, EXPORT_VERSION, true);
+    view.setUint32(8, this.dimensions, true);
+    view.setUint32(12, totalVectors, true);
+    view.setUint32(16, vectorDataLen, true);
+    view.setUint32(20, keysDataLen, true);
+
+    // Write body
+    blob.set(vectorBytes, EXPORT_HEADER_BYTES);
+    blob.set(keysBytes, EXPORT_HEADER_BYTES + vectorDataLen);
+
+    return blob;
+  }
+
+  /**
+   * Import data from a binary blob, replacing all existing data.
+   * Performs a dimension check against the configured dimensions.
+   */
+  import(blob: Uint8Array): void {
+    this.assertOpen();
+
+    if (blob.byteLength < EXPORT_HEADER_BYTES) {
+      throw new Error("Invalid import data: blob too short");
+    }
+
+    const view = new DataView(blob.buffer, blob.byteOffset, blob.byteLength);
+
+    // Validate magic
+    const magic = view.getUint32(0, true);
+    if (magic !== EXPORT_MAGIC) {
+      throw new Error("Invalid import data: unrecognized format");
+    }
+
+    // Read header
+    const dimensions = view.getUint32(8, true);
+    const vectorCount = view.getUint32(12, true);
+    const vectorDataLen = view.getUint32(16, true);
+    const keysDataLen = view.getUint32(20, true);
+
+    // Dimension check
+    if (dimensions !== this.dimensions) {
+      throw new Error(`Import dimension mismatch: expected ${this.dimensions}, got ${dimensions}`);
+    }
+
+    // Validate blob size
+    const expectedSize = EXPORT_HEADER_BYTES + vectorDataLen + keysDataLen;
+    if (blob.byteLength < expectedSize) {
+      throw new Error("Invalid import data: blob truncated");
+    }
+
+    // Decode keys
+    const keysStart = EXPORT_HEADER_BYTES + vectorDataLen;
+    const keysBytes = blob.subarray(keysStart, keysStart + keysDataLen);
+    const keys = keysDataLen > 0 ? decodeLexicon(keysBytes) : [];
+
+    // Clear existing state
+    this.keyToSlot.clear();
+    this.slotToKey.length = 0;
+    this.memoryManager.reset();
+
+    // Load vectors
+    if (vectorCount > 0) {
+      const vectorBytes = blob.subarray(EXPORT_HEADER_BYTES, EXPORT_HEADER_BYTES + vectorDataLen);
+      this.memoryManager.ensureCapacity(vectorCount);
+      this.memoryManager.loadVectorBytes(vectorBytes, vectorCount);
+    }
+
+    // Rebuild key mappings
+    for (let i = 0; i < keys.length; i++) {
+      this.keyToSlot.set(keys[i], i);
+      this.slotToKey[i] = keys[i];
+    }
   }
 
   /**

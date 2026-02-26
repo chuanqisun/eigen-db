@@ -96,6 +96,26 @@ To delete all vectors and storage:
 await db.clear();
 ```
 
+### 5) Export and import
+
+Export the entire database to a single binary blob:
+
+```ts
+const blob = db.export(); // Uint8Array
+```
+
+Import a blob into a database, replacing all existing data:
+
+```ts
+db.import(blob);
+```
+
+Notes:
+
+- `import()` replaces all existing data in the target database.
+- A dimension check is performed on import: the blob must have been exported from a database with the same `dimensions` setting.
+- The blob is a self-contained binary file that combines vectors and keys.
+
 ## Similarity metric
 
 Similarity is the dot product of the query and stored vectors.
@@ -164,6 +184,11 @@ Opens (or creates) a database instance and loads persisted data.
   - Subsequent operations throw.
 - `clear(): Promise<void>`
   - Clears in-memory state and destroys storage for this DB.
+- `export(): Uint8Array`
+  - Exports the entire database as a single binary blob.
+- `import(blob: Uint8Array): void`
+  - Imports data from a binary blob, replacing all existing data.
+  - Throws on dimension mismatch between the blob and the database.
 
 ### `ResultItem`
 
