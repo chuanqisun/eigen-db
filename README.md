@@ -50,11 +50,11 @@ Notes:
 ```ts
 const queryVector = embeddingQuery;
 
-// Returns a plain array of { key, distance } sorted by ascending distance
+// Returns a plain array of { key, similarity } sorted by descending similarity
 const results = db.query(queryVector, { topK: 10 });
 
-for (const { key, distance } of results) {
-  console.log(key, distance);
+for (const { key, similarity } of results) {
+  console.log(key, similarity);
 }
 ```
 
@@ -64,23 +64,23 @@ For lazy iteration (useful for pagination or early stopping):
 const results = db.query(queryVector, { topK: 100, iterable: true });
 
 // Iterate and break early — keys are resolved on demand
-for (const { key, distance } of results) {
-  if (distance > 0.5) break;
-  console.log(key, distance);
+for (const { key, similarity } of results) {
+  if (similarity < 0.5) break;
+  console.log(key, similarity);
 }
 
 // Or spread into an array when you need all results
 const all = [...results];
 ```
 
-Use `maxDistance` to automatically cut off results beyond a threshold:
+Use `minSimilarity` to automatically cut off results below a threshold:
 
 ```ts
-// Only return results within distance 0.3 (inclusive)
-const results = db.query(queryVector, { maxDistance: 0.3 });
+// Only return results with similarity ≥ 0.7 (inclusive)
+const results = db.query(queryVector, { minSimilarity: 0.7 });
 
 // Works with iterable mode too — iteration stops early at the threshold
-const results = db.query(queryVector, { maxDistance: 0.3, iterable: true });
+const results = db.query(queryVector, { minSimilarity: 0.7, iterable: true });
 ```
 
 ### 4) Persist and lifecycle
@@ -96,20 +96,20 @@ To delete all vectors and storage:
 await db.clear();
 ```
 
-## Distance metric
+## Similarity metric
 
-Distance is defined as `1 - dotProduct(query, stored)`.
+Similarity is the dot product of the query and stored vectors.
 
-- **With normalization enabled** (the default): vectors are L2-normalized before storage and query, so the dot product equals cosine similarity. Distance then equals **cosine distance**, ranging from **0** (identical) to **2** (opposite).
-- **With normalization disabled** (`normalize: false`): the dot product is computed on raw vectors. Distance is `1 - dotProduct`, which is not a standard metric and its range depends on the magnitude of your vectors. Use this mode when your vectors are already normalized or when you want raw dot-product semantics.
+- **With normalization enabled** (the default): vectors are L2-normalized before storage and query, so the dot product equals cosine similarity. Similarity ranges from **1** (identical) to **-1** (opposite), with **0** indicating orthogonal vectors.
+- **With normalization disabled** (`normalize: false`): the dot product is computed on raw vectors. The range depends on the magnitude of your vectors. Use this mode when your vectors are already normalized or when you want raw dot-product semantics.
 
 **When to normalize:**
 
 | Scenario | Normalize? | Notes |
 | --- | --- | --- |
-| Using embeddings from OpenAI, Cohere, etc. | `true` (default) | Embeddings may not be unit-length; normalization ensures cosine distance. |
+| Using embeddings from OpenAI, Cohere, etc. | `true` (default) | Embeddings may not be unit-length; normalization ensures cosine similarity. |
 | Vectors are already unit-length | Either | Setting `false` avoids redundant work. |
-| You need raw dot-product semantics | `false` | Distance will be `1 - dotProduct`; range depends on vector magnitudes. |
+| You need raw dot-product semantics | `false` | Similarity will be the raw dot product; range depends on vector magnitudes. |
 
 ## Full API Reference
 
@@ -151,7 +151,7 @@ Opens (or creates) a database instance and loads persisted data.
 - `getMany(keys: string[]): (number[] | undefined)[]`
   - Batch lookup.
 - `query(value: VectorInput, options?: QueryOptions): ResultItem[]`
-  - Returns results sorted by ascending distance as a plain array.
+  - Returns results sorted by descending similarity as a plain array.
   - Throws on dimension mismatch.
 - `query(value: VectorInput, options: QueryOptions & { iterable: true }): Iterable<ResultItem>`
   - With `{ iterable: true }`, returns a lazy iterable. Keys are resolved
@@ -170,11 +170,11 @@ Opens (or creates) a database instance and loads persisted data.
 ```ts
 interface ResultItem {
   key: string;
-  distance: number;
+  similarity: number;
 }
 ```
 
-- `distance` — Defined as `1 - dotProduct`. With normalization (default), this is cosine distance: 0 = identical, 2 = opposite.
+- `similarity` — The dot product of query and stored vectors. With normalization (default), this is cosine similarity: 1 = identical, -1 = opposite.
 
 ### Option types
 
@@ -218,7 +218,7 @@ interface SetOptions {
 ```ts
 interface QueryOptions {
   topK?: number; // default: Infinity (all results)
-  maxDistance?: number; // inclusive upper bound on distance; results beyond this are excluded
+  minSimilarity?: number; // inclusive lower bound on similarity; results below this are excluded
   normalize?: boolean;
   iterable?: boolean; // when true, returns Iterable<ResultItem> instead of ResultItem[]
 }
@@ -289,7 +289,7 @@ npm run dev
 
 ## Practical notes
 
-- Distance is `1 - dotProduct`; with normalization enabled (default), this behaves like cosine distance (0 = identical, 2 = opposite).
-- `topK` defaults to `Infinity`, returning all stored vectors sorted by distance. Use `maxDistance` to limit results by proximity.
+- Similarity is the dot product of query and stored vectors; with normalization enabled (default), this behaves like cosine similarity (1 = identical, -1 = opposite).
+- `topK` defaults to `Infinity`, returning all stored vectors sorted by similarity. Use `minSimilarity` to limit results by proximity.
 - Querying an empty database returns an empty array (`[]`).
 - `flush()` writes deduplicated state, and reopen preserves key-to-slot mapping.

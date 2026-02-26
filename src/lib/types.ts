@@ -41,8 +41,8 @@ export interface SetOptions {
 export interface QueryOptions {
   /** Maximum number of results to return. Defaults to Infinity (all results). */
   topK?: number;
-  /** Maximum distance threshold (inclusive). Results with distance > maxDistance are excluded. */
-  maxDistance?: number;
+  /** Minimum similarity threshold (inclusive). Results with similarity < minSimilarity are excluded. */
+  minSimilarity?: number;
   /** Override normalization for this call. */
   normalize?: boolean;
   /** When true, returns an Iterable<ResultItem> instead of ResultItem[]. */

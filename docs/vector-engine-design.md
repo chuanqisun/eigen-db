@@ -134,7 +134,7 @@ The user queries using plain text. They don't need to know if the word exists in
 
 ```typescript
 // Querying with a word that MIGHT NOT be in the database
-// The engine will embed "physics", calculate cosine distance against all records,
+// The engine will embed "physics", calculate cosine similarity against all records,
 // and return the top K results.
 const results = await db.search("physics", 2);
 

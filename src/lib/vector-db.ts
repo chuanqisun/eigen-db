@@ -185,12 +185,13 @@ export class VectorDB {
   /**
    * Search for the most similar vectors to the given query vector.
    *
-   * Default: returns a plain ResultItem[] sorted by ascending distance.
+   * Default: returns a plain ResultItem[] sorted by descending similarity.
    * With `{ iterable: true }`: returns a lazy Iterable<ResultItem> where keys
    * are resolved only as each item is consumed.
    *
-   * Distance is defined as `1 - dotProduct`. With normalization (default),
-   * this equals cosine distance: 0 = identical, 2 = opposite.
+   * Similarity is the dot product of query and stored vectors. With
+   * normalization (default), this equals cosine similarity: 1 = identical,
+   * -1 = opposite.
    */
   query(value: VectorInput, options: QueryOptions & { iterable: true }): Iterable<ResultItem>;
   query(value: VectorInput, options?: QueryOptions): ResultItem[];
@@ -198,7 +199,7 @@ export class VectorDB {
     this.assertOpen();
 
     const k = options?.topK ?? Infinity;
-    const maxDistance = options?.maxDistance;
+    const minSimilarity = options?.minSimilarity;
     const iterable = options && "iterable" in options && options.iterable;
 
     if (this.size === 0) {
@@ -260,9 +261,9 @@ export class VectorDB {
     };
 
     if (iterable) {
-      return iterableResults(scores, resolveKey, k, maxDistance);
+      return iterableResults(scores, resolveKey, k, minSimilarity);
     }
-    return topKResults(scores, resolveKey, k, maxDistance);
+    return topKResults(scores, resolveKey, k, minSimilarity);
   }
 
   /**

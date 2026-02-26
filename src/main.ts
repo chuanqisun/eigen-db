@@ -103,10 +103,10 @@ async function main() {
 
     log(`Search: ${elapsed} ms — ${results.length} results from ${db.size} records (top ${topK})`);
 
-    let html = "<table><thead><tr><th>#</th><th>Distance</th><th>Key</th></tr></thead><tbody>";
+    let html = "<table><thead><tr><th>#</th><th>Similarity</th><th>Key</th></tr></thead><tbody>";
     for (let i = 0; i < results.length; i++) {
       const r = results[i];
-      html += `<tr><td>${i + 1}</td><td>${r.distance.toFixed(4)}</td><td>${r.key}</td></tr>`;
+      html += `<tr><td>${i + 1}</td><td>${r.similarity.toFixed(4)}</td><td>${r.key}</td></tr>`;
     }
     html += "</tbody></table>";
     resultsDiv.innerHTML = html;

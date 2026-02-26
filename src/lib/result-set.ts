@@ -7,27 +7,28 @@
  *   2. iterableResults — returns a lazy Iterable<ResultItem> where keys are
  *      resolved only as each item is consumed (for pagination / streaming)
  *
- * Distance is defined as `1 - dotProduct`. For normalized vectors (the default),
- * this equals cosine distance, ranging from 0 (identical) to 2 (opposite).
+ * Similarity is the dot product of query and stored vectors. For normalized
+ * vectors (the default), this equals cosine similarity, ranging from 1
+ * (identical) to -1 (opposite).
  */
 
 export interface ResultItem {
   key: string;
-  distance: number;
+  similarity: number;
 }
 
 export type KeyResolver = (index: number) => string;
 
 /**
- * Sort by ascending distance and return the top K results as a plain array.
+ * Sort by descending similarity and return the top K results as a plain array.
  * All keys are resolved eagerly.
- * If maxDistance is provided, results with distance > maxDistance are excluded.
+ * If minSimilarity is provided, results with similarity < minSimilarity are excluded.
  */
 export function topKResults(
   scores: Float32Array,
   resolveKey: KeyResolver,
   topK: number,
-  maxDistance?: number,
+  minSimilarity?: number,
 ): ResultItem[] {
   const n = scores.length;
   if (n === 0) return [];
@@ -40,19 +41,19 @@ export function topKResults(
   const results: ResultItem[] = [];
   for (let i = 0; i < k; i++) {
     const idx = indices[i];
-    const distance = 1 - scores[idx];
-    if (maxDistance !== undefined && distance > maxDistance) break;
-    results.push({ key: resolveKey(idx), distance });
+    const similarity = scores[idx];
+    if (minSimilarity !== undefined && similarity < minSimilarity) break;
+    results.push({ key: resolveKey(idx), similarity });
   }
   return results;
 }
 
 /**
- * Sort by ascending distance and return a lazy iterable over the top K results.
+ * Sort by descending similarity and return a lazy iterable over the top K results.
  * Keys are resolved only when each item is consumed, saving allocations
  * when the caller iterates partially (e.g., pagination).
  *
- * If maxDistance is provided, iteration stops when distance > maxDistance.
+ * If minSimilarity is provided, iteration stops when similarity < minSimilarity.
  *
  * The returned iterable is re-iterable — each call to [Symbol.iterator]()
  * produces a fresh cursor over the same pre-sorted data.
@@ -61,7 +62,7 @@ export function iterableResults(
   scores: Float32Array,
   resolveKey: KeyResolver,
   topK: number,
-  maxDistance?: number,
+  minSimilarity?: number,
 ): Iterable<ResultItem> {
   const n = scores.length;
   if (n === 0) return [];
@@ -79,11 +80,11 @@ export function iterableResults(
         next(): IteratorResult<ResultItem> {
           if (i >= k) return { done: true, value: undefined };
           const idx = indices[i++];
-          const distance = 1 - scores[idx];
-          if (maxDistance !== undefined && distance > maxDistance) return { done: true, value: undefined };
+          const similarity = scores[idx];
+          if (minSimilarity !== undefined && similarity < minSimilarity) return { done: true, value: undefined };
           return {
             done: false,
-            value: { key: resolveKey(idx), distance },
+            value: { key: resolveKey(idx), similarity },
           };
         },
       };
