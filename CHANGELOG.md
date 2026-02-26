@@ -1,3 +1,7 @@
+# v4.3.0
+
+Added: option to choose between in memory or OPFS storage backends
+
 # v4.2.0
 
 Added: import/export in binary format
