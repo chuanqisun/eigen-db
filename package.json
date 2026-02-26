@@ -1,9 +1,10 @@
 {
   "name": "eigen-db",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src/lib"
   ],
   "main": "./dist/",
   "scripts": {

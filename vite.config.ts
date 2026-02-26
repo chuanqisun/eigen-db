@@ -8,6 +8,7 @@ export default defineConfig({
       name: "EigenDB",
       fileName: "eigen-db",
     },
+    sourcemap: true,
   },
   test: {
     include: ["src/**/*.test.ts"],
