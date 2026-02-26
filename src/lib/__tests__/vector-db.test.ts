@@ -803,7 +803,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      await expect(db2.import(bytesToStream(truncated))).rejects.toThrow();
+      await expect(db2.import(bytesToStream(truncated))).rejects.toThrow("unexpected end of stream");
     });
 
     it("import works correctly with chunked stream (small chunks)", async () => {
