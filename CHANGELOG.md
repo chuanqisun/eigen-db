@@ -1,3 +1,7 @@
+# v4.0.1
+
+Fixed: the source code was stale
+
 # v4.0.0
 
 Changed: `query()` returns simple iterable
