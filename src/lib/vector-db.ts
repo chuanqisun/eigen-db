@@ -387,6 +387,11 @@ export class VectorDB {
     }
 
     // Read header
+    const version = view.getUint32(4, true);
+    if (version !== EXPORT_VERSION) {
+      throw new Error(`Unsupported import version: expected ${EXPORT_VERSION}, got ${version}`);
+    }
+
     const dimensions = view.getUint32(8, true);
     const vectorCount = view.getUint32(12, true);
     const vectorDataLen = view.getUint32(16, true);

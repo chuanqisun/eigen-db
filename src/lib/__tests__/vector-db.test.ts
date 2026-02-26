@@ -731,6 +731,31 @@ describe("VectorDB", () => {
       const tooShort = new Uint8Array(10);
       expect(() => db.import(tooShort)).toThrow();
     });
+
+    it("import throws on truncated blob body", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      const blob = db1.export();
+
+      // Truncate the blob to have valid header but incomplete body
+      const truncated = blob.slice(0, 25);
+
+      const storage2 = new InMemoryStorageProvider();
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage: storage2,
+        wasmBinary,
+      });
+
+      expect(() => db2.import(truncated)).toThrow("truncated");
+    });
   }
 
   it("throws VectorCapacityExceededError when full", async () => {
