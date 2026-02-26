@@ -2,20 +2,18 @@
  * Options for opening a VectorDB instance.
  */
 export interface OpenOptions {
-  /** Name of the OPFS directory. Defaults to "default". */
-  name?: string;
   /** Vector dimensions (e.g., 1536 for OpenAI text-embedding-3-small) */
   dimensions: number;
   /** Whether to normalize vectors on set/query (default: true). */
   normalize?: boolean;
+  /** Storage provider for persistence. Defaults to InMemoryStorageProvider. Use OPFSStorageProvider for browser persistence. */
+  storage?: import("./storage").StorageProvider;
 }
 
 /**
  * Extended options including internal overrides for testing/advanced use.
  */
 export interface OpenOptionsInternal extends OpenOptions {
-  /** Override the storage provider (default: OPFS). Useful for testing. */
-  storage?: import("./storage").StorageProvider;
   /** Pre-compiled WASM binary. If not provided, uses the embedded SIMD binary. Set to null to force JS-only mode. */
   wasmBinary?: Uint8Array | null;
 }
