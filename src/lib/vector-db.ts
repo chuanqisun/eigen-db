@@ -20,14 +20,7 @@ import { iterableResults, topKResults } from "./result-set";
 import { getSimdWasmBinary } from "./simd-binary";
 import type { StorageProvider } from "./storage";
 import { OPFSStorageProvider } from "./storage";
-import type {
-  IterableQueryOptions,
-  OpenOptions,
-  OpenOptionsInternal,
-  QueryOptions,
-  SetOptions,
-  VectorInput,
-} from "./types";
+import type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
 import { instantiateWasm, type WasmExports } from "./wasm-compute";
 
 const VECTORS_FILE = "vectors.bin";
@@ -196,9 +189,9 @@ export class VectorDB {
    * With `{ iterable: true }`: returns a lazy Iterable<ResultItem> where keys
    * are resolved only as each item is consumed.
    */
-  query(value: VectorInput, options: IterableQueryOptions): Iterable<ResultItem>;
+  query(value: VectorInput, options: QueryOptions & { iterable: true }): Iterable<ResultItem>;
   query(value: VectorInput, options?: QueryOptions): ResultItem[];
-  query(value: VectorInput, options?: QueryOptions | IterableQueryOptions): ResultItem[] | Iterable<ResultItem> {
+  query(value: VectorInput, options?: QueryOptions): ResultItem[] | Iterable<ResultItem> {
     this.assertOpen();
 
     const k = options?.topK ?? this.size;

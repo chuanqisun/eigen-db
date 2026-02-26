@@ -43,14 +43,6 @@ export interface QueryOptions {
   topK?: number;
   /** Override normalization for this call. */
   normalize?: boolean;
-}
-
-/**
- * Query options requesting a lazy iterable instead of a materialized array.
- * Keys are resolved only as each item is consumed, saving allocations
- * when the caller doesn't need the full result set.
- */
-export interface IterableQueryOptions extends QueryOptions {
   /** When true, returns an Iterable<ResultItem> instead of ResultItem[]. */
-  iterable: true;
+  iterable?: boolean;
 }
