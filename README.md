@@ -293,3 +293,7 @@ npm run dev
 - `topK` defaults to `Infinity`, returning all stored vectors sorted by similarity. Use `minSimilarity` to limit results by proximity.
 - Querying an empty database returns an empty array (`[]`).
 - `flush()` writes deduplicated state, and reopen preserves key-to-slot mapping.
+
+## Related
+
+- Just need cosine similarity? Try [fast-theta](https://github.com/chuanqisun/fast-theta).
