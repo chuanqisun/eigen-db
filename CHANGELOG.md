@@ -1,3 +1,7 @@
+# v2.1.2
+
+Fixed: type export issue
+
 # v2.1.1
 
 Fixed: package.json issues
