@@ -12,6 +12,7 @@
   "module": "./dist/eigen-db.js",
   "exports": {
     ".": {
+      "types": "./src/lib/index.ts",
       "import": "./dist/eigen-db.js",
       "require": "./dist/eigen-db.umd.cjs"
     }
