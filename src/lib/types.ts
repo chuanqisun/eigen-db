@@ -36,10 +36,21 @@ export interface SetOptions {
 
 /**
  * Options for query operations.
+ * Returns a plain ResultItem[] array by default.
  */
 export interface QueryOptions {
   /** Maximum number of results to return. Defaults to all. */
   topK?: number;
   /** Override normalization for this call. */
   normalize?: boolean;
+}
+
+/**
+ * Query options requesting a lazy iterable instead of a materialized array.
+ * Keys are resolved only as each item is consumed, saving allocations
+ * when the caller doesn't need the full result set.
+ */
+export interface IterableQueryOptions extends QueryOptions {
+  /** When true, returns an Iterable<ResultItem> instead of ResultItem[]. */
+  iterable: true;
 }

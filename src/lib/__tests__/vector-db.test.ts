@@ -181,16 +181,16 @@ describe("VectorDB", () => {
       expect(results.length).toBe(3);
 
       // x-axis should be the best match (identical direction)
-      expect(results.get(0).key).toBe("x-axis");
-      expect(results.get(0).score).toBeCloseTo(1.0, 2);
+      expect(results[0].key).toBe("x-axis");
+      expect(results[0].score).toBeCloseTo(1.0, 2);
 
       // xy-axis should be second (partially aligned)
-      expect(results.get(1).key).toBe("xy-axis");
-      expect(results.get(1).score).toBeGreaterThan(0);
+      expect(results[1].key).toBe("xy-axis");
+      expect(results[1].score).toBeGreaterThan(0);
 
       // y-axis should be last (orthogonal)
-      expect(results.get(2).key).toBe("y-axis");
-      expect(results.get(2).score).toBeCloseTo(0.0, 2);
+      expect(results[2].key).toBe("y-axis");
+      expect(results[2].score).toBeCloseTo(0.0, 2);
     });
 
     it("query respects topK option", async () => {
@@ -208,7 +208,7 @@ describe("VectorDB", () => {
       expect(results.length).toBe(2);
     });
 
-    it("query on empty database returns empty result", async () => {
+    it("query on empty database returns empty array", async () => {
       const db = await VectorDB.open({
         dimensions: 4,
         storage,
@@ -216,7 +216,7 @@ describe("VectorDB", () => {
       });
 
       const results = db.query([1, 0, 0, 0]);
-      expect(results.length).toBe(0);
+      expect(results).toEqual([]);
     });
 
     it("query validates vector dimensions", async () => {
@@ -230,7 +230,7 @@ describe("VectorDB", () => {
       expect(() => db.query([1, 2, 3, 4, 5, 6, 7, 8])).toThrow("dimension mismatch");
     });
 
-    it("query results support pagination", async () => {
+    it("query results support iterable mode for pagination", async () => {
       const db = await VectorDB.open({
         dimensions: 4,
         normalize: false,
@@ -244,16 +244,19 @@ describe("VectorDB", () => {
         db.set(`t${i}`, vec);
       }
 
-      const results = db.query([1, 0, 0, 0], { normalize: false });
+      const results = db.query([1, 0, 0, 0], { normalize: false, iterable: true });
 
-      const page0 = results.getPage(0, 2);
-      expect(page0).toHaveLength(2);
+      // Spread into array
+      const all = [...results];
+      expect(all).toHaveLength(5);
 
-      const page1 = results.getPage(1, 2);
-      expect(page1).toHaveLength(2);
-
-      const page2 = results.getPage(2, 2);
-      expect(page2).toHaveLength(1);
+      // Partial iteration (simulate pagination)
+      const page: { key: string; score: number }[] = [];
+      for (const item of results) {
+        page.push(item);
+        if (page.length === 2) break;
+      }
+      expect(page).toHaveLength(2);
     });
 
     it("query after overwrite uses updated vector", async () => {
@@ -271,8 +274,8 @@ describe("VectorDB", () => {
 
       const results = db.query([0, 1, 0, 0]);
       // Both 'point' and 'other' are now along y-axis, so both should score high
-      expect(results.get(0).score).toBeCloseTo(1.0, 2);
-      expect(results.get(1).score).toBeCloseTo(1.0, 2);
+      expect(results[0].score).toBeCloseTo(1.0, 2);
+      expect(results[1].score).toBeCloseTo(1.0, 2);
       expect(db.size).toBe(2);
     });
 

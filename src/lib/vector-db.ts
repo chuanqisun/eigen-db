@@ -15,11 +15,12 @@ import { normalize, searchAll } from "./compute";
 import { VectorCapacityExceededError } from "./errors";
 import { decodeLexicon, encodeLexicon } from "./lexicon";
 import { MemoryManager } from "./memory-manager";
-import { ResultSet } from "./result-set";
+import type { ResultItem } from "./result-set";
+import { iterableResults, topKResults } from "./result-set";
 import { getSimdWasmBinary } from "./simd-binary";
 import type { StorageProvider } from "./storage";
 import { OPFSStorageProvider } from "./storage";
-import type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
+import type { IterableQueryOptions, OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
 import { instantiateWasm, type WasmExports } from "./wasm-compute";
 
 const VECTORS_FILE = "vectors.bin";
@@ -183,15 +184,21 @@ export class VectorDB {
 
   /**
    * Search for the most similar vectors to the given query vector.
-   * Returns a ResultSet sorted by descending similarity score.
+   *
+   * Default: returns a plain ResultItem[] sorted by descending similarity.
+   * With `{ iterable: true }`: returns a lazy Iterable<ResultItem> where keys
+   * are resolved only as each item is consumed.
    */
-  query(value: VectorInput, options?: QueryOptions): ResultSet {
+  query(value: VectorInput, options: IterableQueryOptions): Iterable<ResultItem>;
+  query(value: VectorInput, options?: QueryOptions): ResultItem[];
+  query(value: VectorInput, options?: QueryOptions | IterableQueryOptions): ResultItem[] | Iterable<ResultItem> {
     this.assertOpen();
 
     const k = options?.topK ?? this.size;
+    const iterable = options && "iterable" in options && options.iterable;
 
     if (this.size === 0) {
-      return ResultSet.fromScores(new Float32Array(0), () => "", 0);
+      return [];
     }
 
     if (value.length !== this.dimensions) {
@@ -248,7 +255,10 @@ export class VectorDB {
       return slotToKey[slotIndex];
     };
 
-    return ResultSet.fromScores(scores, resolveKey, k);
+    if (iterable) {
+      return iterableResults(scores, resolveKey, k);
+    }
+    return topKResults(scores, resolveKey, k);
   }
 
   /**

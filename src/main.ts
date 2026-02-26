@@ -103,10 +103,9 @@ async function main() {
 
     log(`Search: ${elapsed} ms — ${results.length} results from ${db.size} records (top ${topK})`);
 
-    const page = results.getPage(0, topK);
     let html = "<table><thead><tr><th>#</th><th>Score</th><th>Key</th></tr></thead><tbody>";
-    for (let i = 0; i < page.length; i++) {
-      const r = page[i];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
       html += `<tr><td>${i + 1}</td><td>${r.score.toFixed(4)}</td><td>${r.key}</td></tr>`;
     }
     html += "</tbody></table>";

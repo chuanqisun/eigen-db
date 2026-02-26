@@ -50,15 +50,27 @@ Notes:
 ```ts
 const queryVector = embeddingQuery;
 
+// Returns a plain array of { key, score } sorted by similarity
 const results = db.query(queryVector, { topK: 10 });
 
-for (let i = 0; i < results.length; i++) {
-  const { key, score } = results.get(i);
-  console.log(i, key, score);
+for (const { key, score } of results) {
+  console.log(key, score);
+}
+```
+
+For lazy iteration (useful for pagination or early stopping):
+
+```ts
+const results = db.query(queryVector, { topK: 100, iterable: true });
+
+// Iterate and break early — keys are resolved on demand
+for (const { key, score } of results) {
+  if (score < 0.5) break;
+  console.log(key, score);
 }
 
-// Or paginate for UI rendering:
-const page0 = results.getPage(0, 10);
+// Or spread into an array when you need all results
+const all = [...results];
 ```
 
 ### 4) Persist and lifecycle
@@ -80,10 +92,9 @@ await db.clear();
 
 ```ts
 export { DB };
-export { ResultSet };
 export type { ResultItem };
 export { VectorCapacityExceededError };
-export type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions, VectorInput };
+export type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions, IterableQueryOptions, VectorInput };
 export { InMemoryStorageProvider, OPFSStorageProvider };
 export type { StorageProvider };
 ```
@@ -114,8 +125,12 @@ Opens (or creates) a database instance and loads persisted data.
   - Batch insert/update.
 - `getMany(keys: string[]): (number[] | undefined)[]`
   - Batch lookup.
-- `query(value: VectorInput, options?: QueryOptions): ResultSet`
-  - Returns similarity-ranked results.
+- `query(value: VectorInput, options?: QueryOptions): ResultItem[]`
+  - Returns similarity-ranked results as a plain array.
+  - Throws on dimension mismatch.
+- `query(value: VectorInput, options: IterableQueryOptions): Iterable<ResultItem>`
+  - With `{ iterable: true }`, returns a lazy iterable. Keys are resolved
+    only as each item is consumed, enabling early stopping and pagination.
   - Throws on dimension mismatch.
 - `flush(): Promise<void>`
   - Persists in-memory state to storage.
@@ -124,27 +139,6 @@ Opens (or creates) a database instance and loads persisted data.
   - Subsequent operations throw.
 - `clear(): Promise<void>`
   - Clears in-memory state and destroys storage for this DB.
-
-### `ResultSet`
-
-Represents a lazily resolved, score-sorted search result collection.
-
-#### Properties
-
-- `length: number` — number of results available (bounded by `topK`)
-
-#### Methods
-
-- `get(rank: number): ResultItem`
-  - Returns the item at rank (`0` is best match).
-  - Throws `RangeError` when out of bounds.
-- `getPage(page: number, pageSize: number): ResultItem[]`
-  - Convenience pagination helper.
-
-#### Static
-
-- `fromScores(scores, resolveKey, topK): ResultSet`
-  - Constructs a sorted lazy result set from raw scores.
 
 ### `ResultItem`
 
@@ -201,6 +195,14 @@ interface QueryOptions {
 }
 ```
 
+#### `IterableQueryOptions`
+
+```ts
+interface IterableQueryOptions extends QueryOptions {
+  iterable: true; // returns Iterable<ResultItem> instead of ResultItem[]
+}
+```
+
 ### Storage
 
 #### `StorageProvider`
@@ -239,5 +241,5 @@ Thrown when memory growth would exceed WASM 32-bit memory limits for the configu
 ## Practical notes
 
 - Similarity is dot product; with normalization enabled (default), this behaves like cosine similarity.
-- Querying an empty database returns a `ResultSet` with `length === 0`.
+- Querying an empty database returns an empty array (`[]`).
 - `flush()` writes deduplicated state, and reopen preserves key-to-slot mapping.
