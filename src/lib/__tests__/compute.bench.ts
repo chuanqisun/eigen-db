@@ -1,6 +1,6 @@
-import { describe, bench } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { bench, describe } from "vitest";
 import { normalize as jsNormalize, searchAll as jsSearchAll } from "../compute";
 import { compileWatToWasm, instantiateWasm } from "../wasm-compute";
 
