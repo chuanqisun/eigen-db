@@ -1,3 +1,7 @@
+# v4.1.0
+
+Added: performance optimization in WASM
+
 # v4.0.2
 
 Fixed: `query()` overload type hint issue
