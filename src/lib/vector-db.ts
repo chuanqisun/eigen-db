@@ -2,7 +2,7 @@
  * VectorDB — Key-Value Vector Database
  *
  * Decoupled from embedding providers. Users pass pre-computed vectors
- * as Float32Array values with string keys.
+ * as number arrays (or Float32Array) with string keys.
  *
  * Supports:
  * - set/get/setMany/getMany for key-value CRUD
@@ -13,13 +13,13 @@
 
 import { normalize, searchAll } from "./compute";
 import { VectorCapacityExceededError } from "./errors";
-import { encodeLexicon, decodeLexicon } from "./lexicon";
+import { decodeLexicon, encodeLexicon } from "./lexicon";
 import { MemoryManager } from "./memory-manager";
 import { ResultSet } from "./result-set";
 import { getSimdWasmBinary } from "./simd-binary";
 import type { StorageProvider } from "./storage";
 import { OPFSStorageProvider } from "./storage";
-import type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions } from "./types";
+import type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
 import { instantiateWasm, type WasmExports } from "./wasm-compute";
 
 const VECTORS_FILE = "vectors.bin";
@@ -71,10 +71,7 @@ export class VectorDB {
     const shouldNormalize = options.normalize !== false;
 
     // Load existing data from storage
-    const [vectorBytes, keysBytes] = await Promise.all([
-      storage.readAll(VECTORS_FILE),
-      storage.readAll(KEYS_FILE),
-    ]);
+    const [vectorBytes, keysBytes] = await Promise.all([storage.readAll(VECTORS_FILE), storage.readAll(KEYS_FILE)]);
 
     // Decode stored keys
     const keys = keysBytes.byteLength > 0 ? decodeLexicon(keysBytes) : [];
@@ -108,15 +105,7 @@ export class VectorDB {
       }
     }
 
-    return new VectorDB(
-      mm,
-      storage,
-      options.dimensions,
-      shouldNormalize,
-      wasmExports,
-      keyToSlot,
-      slotToKey,
-    );
+    return new VectorDB(mm, storage, options.dimensions, shouldNormalize, wasmExports, keyToSlot, slotToKey);
   }
 
   /** Total number of key-value pairs in the database */
@@ -126,18 +115,16 @@ export class VectorDB {
 
   /**
    * Set a key-value pair. If the key already exists, its vector is overwritten (last-write-wins).
-   * The value is a Float32Array of length equal to the configured dimensions.
+   * The value is a number[] or Float32Array of length equal to the configured dimensions.
    */
-  set(key: string, value: Float32Array, options?: SetOptions): void {
+  set(key: string, value: VectorInput, options?: SetOptions): void {
     this.assertOpen();
 
     if (value.length !== this.dimensions) {
-      throw new Error(
-        `Vector dimension mismatch: expected ${this.dimensions}, got ${value.length}`,
-      );
+      throw new Error(`Vector dimension mismatch: expected ${this.dimensions}, got ${value.length}`);
     }
 
-    // Clone to avoid mutating caller's array during normalization
+    // Convert to Float32Array (also clones to avoid mutating caller's array)
     const vec = new Float32Array(value);
 
     // Normalize if needed
@@ -166,22 +153,22 @@ export class VectorDB {
 
   /**
    * Get the stored vector for a key. Returns undefined if the key does not exist.
-   * Returns a copy of the stored vector.
+   * Returns a copy of the stored vector as a plain number array.
    */
-  get(key: string): Float32Array | undefined {
+  get(key: string): number[] | undefined {
     this.assertOpen();
 
     const slot = this.keyToSlot.get(key);
     if (slot === undefined) return undefined;
 
-    // Return a copy so callers can't corrupt WASM memory
-    return new Float32Array(this.memoryManager.readVector(slot));
+    // Return a plain array copy so callers can't corrupt WASM memory
+    return Array.from(this.memoryManager.readVector(slot));
   }
 
   /**
    * Set multiple key-value pairs at once. Last-write-wins applies within the batch.
    */
-  setMany(entries: [string, Float32Array][]): void {
+  setMany(entries: [string, VectorInput][]): void {
     for (const [key, value] of entries) {
       this.set(key, value);
     }
@@ -190,7 +177,7 @@ export class VectorDB {
   /**
    * Get vectors for multiple keys. Returns undefined for keys that don't exist.
    */
-  getMany(keys: string[]): (Float32Array | undefined)[] {
+  getMany(keys: string[]): (number[] | undefined)[] {
     return keys.map((key) => this.get(key));
   }
 
@@ -198,7 +185,7 @@ export class VectorDB {
    * Search for the most similar vectors to the given query vector.
    * Returns a ResultSet sorted by descending similarity score.
    */
-  query(value: Float32Array, options?: QueryOptions): ResultSet {
+  query(value: VectorInput, options?: QueryOptions): ResultSet {
     this.assertOpen();
 
     const k = options?.topK ?? this.size;
@@ -208,12 +195,10 @@ export class VectorDB {
     }
 
     if (value.length !== this.dimensions) {
-      throw new Error(
-        `Query vector dimension mismatch: expected ${this.dimensions}, got ${value.length}`,
-      );
+      throw new Error(`Query vector dimension mismatch: expected ${this.dimensions}, got ${value.length}`);
     }
 
-    // Clone and optionally normalize the query vector
+    // Convert to Float32Array and optionally normalize the query vector
     const queryVec = new Float32Array(value);
     const doNormalize = options?.normalize ?? this.shouldNormalize;
     if (doNormalize) {
@@ -250,11 +235,7 @@ export class VectorDB {
         this.memoryManager.dbOffset,
         totalVectors * this.dimensions,
       );
-      const scoresView = new Float32Array(
-        this.memoryManager.memory.buffer,
-        scoresOffset,
-        totalVectors,
-      );
+      const scoresView = new Float32Array(this.memoryManager.memory.buffer, scoresOffset, totalVectors);
       searchAll(queryView, dbView, scoresView, totalVectors, this.dimensions);
     }
 
@@ -279,9 +260,7 @@ export class VectorDB {
     const totalVectors = this.memoryManager.vectorCount;
 
     // Serialize vectors from WASM memory
-    const vectorBytes = new Uint8Array(
-      totalVectors * this.dimensions * 4,
-    );
+    const vectorBytes = new Uint8Array(totalVectors * this.dimensions * 4);
     if (totalVectors > 0) {
       const src = new Uint8Array(
         this.memoryManager.memory.buffer,
@@ -294,10 +273,7 @@ export class VectorDB {
     // Serialize keys using lexicon format
     const keysBytes = encodeLexicon(this.slotToKey);
 
-    await Promise.all([
-      this.storage.write(VECTORS_FILE, vectorBytes),
-      this.storage.write(KEYS_FILE, keysBytes),
-    ]);
+    await Promise.all([this.storage.write(VECTORS_FILE, vectorBytes), this.storage.write(KEYS_FILE, keysBytes)]);
   }
 
   /**

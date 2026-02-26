@@ -10,5 +10,5 @@ export { ResultSet } from "./result-set";
 export type { ResultItem } from "./result-set";
 export { InMemoryStorageProvider, OPFSStorageProvider } from "./storage";
 export type { StorageProvider } from "./storage";
-export type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions } from "./types";
+export type { OpenOptions, OpenOptionsInternal, QueryOptions, SetOptions, VectorInput } from "./types";
 export { VectorDB as DB } from "./vector-db";

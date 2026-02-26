@@ -21,6 +21,12 @@ export interface OpenOptionsInternal extends OpenOptions {
 }
 
 /**
+ * Accepted vector input types. Users can pass a plain number[] or a Float32Array.
+ * Internally converted to Float32Array for WASM operations.
+ */
+export type VectorInput = number[] | Float32Array;
+
+/**
  * Options for set/setMany operations.
  */
 export interface SetOptions {

@@ -4,8 +4,8 @@ import "./style.css";
 const DIMENSIONS = 128;
 
 /** Simple character-frequency embedder for demo purposes */
-function embed(text: string): Float32Array {
-  const vec = new Float32Array(DIMENSIONS);
+function embed(text: string): number[] {
+  const vec = new Array<number>(DIMENSIONS).fill(0);
   const lower = text.toLowerCase();
   for (let i = 0; i < lower.length; i++) {
     vec[lower.charCodeAt(i) % DIMENSIONS] += 1;
@@ -63,7 +63,7 @@ async function main() {
     log(`Generating ${count} random strings…`);
     await new Promise((r) => setTimeout(r, 0)); // let UI update
 
-    const entries: [string, Float32Array][] = [];
+    const entries: [string, number[]][] = [];
     for (let i = 0; i < count; i++) {
       const text = randomString(8 + ((Math.random() * 24) | 0));
       entries.push([text, embed(text)]);

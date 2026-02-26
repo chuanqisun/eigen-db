@@ -58,7 +58,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([1, 2, 3, 4]));
+      db.set("a", [1, 2, 3, 4]);
       expect(db.size).toBe(1);
 
       const result = db.get("a");
@@ -77,8 +77,8 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([1, 0, 0, 0]));
-      db.set("a", new Float32Array([0, 1, 0, 0]));
+      db.set("a", [1, 0, 0, 0]);
+      db.set("a", [0, 1, 0, 0]);
 
       expect(db.size).toBe(1); // only one entry
       const result = db.get("a");
@@ -94,9 +94,9 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("key1", new Float32Array([1, 0, 0, 0]));
-      db.set("key1", new Float32Array([0, 1, 0, 0]));
-      db.set("key1", new Float32Array([0, 0, 1, 0]));
+      db.set("key1", [1, 0, 0, 0]);
+      db.set("key1", [0, 1, 0, 0]);
+      db.set("key1", [0, 0, 1, 0]);
 
       expect(db.size).toBe(1);
       const result = db.get("key1");
@@ -120,7 +120,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      expect(() => db.set("a", new Float32Array(8))).toThrow("dimension mismatch");
+      expect(() => db.set("a", [1, 2, 3, 4, 5, 6, 7, 8])).toThrow("dimension mismatch");
     });
 
     // --- setMany and getMany ---
@@ -133,9 +133,9 @@ describe("VectorDB", () => {
       });
 
       db.setMany([
-        ["a", new Float32Array([1, 0, 0, 0])],
-        ["b", new Float32Array([0, 1, 0, 0])],
-        ["c", new Float32Array([0, 0, 1, 0])],
+        ["a", [1, 0, 0, 0]],
+        ["b", [0, 1, 0, 0]],
+        ["c", [0, 0, 1, 0]],
       ]);
 
       expect(db.size).toBe(3);
@@ -156,8 +156,8 @@ describe("VectorDB", () => {
       });
 
       db.setMany([
-        ["x", new Float32Array([1, 0, 0, 0])],
-        ["x", new Float32Array([0, 0, 0, 1])],
+        ["x", [1, 0, 0, 0]],
+        ["x", [0, 0, 0, 1]],
       ]);
 
       expect(db.size).toBe(1);
@@ -173,11 +173,11 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("x-axis", new Float32Array([1, 0, 0, 0]));
-      db.set("y-axis", new Float32Array([0, 1, 0, 0]));
-      db.set("xy-axis", new Float32Array([1, 1, 0, 0]));
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
 
-      const results = db.query(new Float32Array([1, 0, 0, 0]));
+      const results = db.query([1, 0, 0, 0]);
       expect(results.length).toBe(3);
 
       // x-axis should be the best match (identical direction)
@@ -200,11 +200,11 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([1, 0, 0, 0]));
-      db.set("b", new Float32Array([0, 1, 0, 0]));
-      db.set("c", new Float32Array([0, 0, 1, 0]));
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+      db.set("c", [0, 0, 1, 0]);
 
-      const results = db.query(new Float32Array([1, 0, 0, 0]), { topK: 2 });
+      const results = db.query([1, 0, 0, 0], { topK: 2 });
       expect(results.length).toBe(2);
     });
 
@@ -215,7 +215,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      const results = db.query(new Float32Array([1, 0, 0, 0]));
+      const results = db.query([1, 0, 0, 0]);
       expect(results.length).toBe(0);
     });
 
@@ -226,8 +226,8 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([1, 0, 0, 0]));
-      expect(() => db.query(new Float32Array(8))).toThrow("dimension mismatch");
+      db.set("a", [1, 0, 0, 0]);
+      expect(() => db.query([1, 2, 3, 4, 5, 6, 7, 8])).toThrow("dimension mismatch");
     });
 
     it("query results support pagination", async () => {
@@ -239,12 +239,12 @@ describe("VectorDB", () => {
       });
 
       for (let i = 0; i < 5; i++) {
-        const vec = new Float32Array(4);
+        const vec = [0, 0, 0, 0];
         vec[0] = 1 - i * 0.2;
         db.set(`t${i}`, vec);
       }
 
-      const results = db.query(new Float32Array([1, 0, 0, 0]), { normalize: false });
+      const results = db.query([1, 0, 0, 0], { normalize: false });
 
       const page0 = results.getPage(0, 2);
       expect(page0).toHaveLength(2);
@@ -263,13 +263,13 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("point", new Float32Array([1, 0, 0, 0]));
-      db.set("other", new Float32Array([0, 1, 0, 0]));
+      db.set("point", [1, 0, 0, 0]);
+      db.set("other", [0, 1, 0, 0]);
 
       // Overwrite 'point' to be along y-axis
-      db.set("point", new Float32Array([0, 1, 0, 0]));
+      db.set("point", [0, 1, 0, 0]);
 
-      const results = db.query(new Float32Array([0, 1, 0, 0]));
+      const results = db.query([0, 1, 0, 0]);
       // Both 'point' and 'other' are now along y-axis, so both should score high
       expect(results.get(0).score).toBeCloseTo(1.0, 2);
       expect(results.get(1).score).toBeCloseTo(1.0, 2);
@@ -285,8 +285,8 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db1.set("alpha", new Float32Array([1, 0, 0, 0]));
-      db1.set("beta", new Float32Array([0, 1, 0, 0]));
+      db1.set("alpha", [1, 0, 0, 0]);
+      db1.set("beta", [0, 1, 0, 0]);
       await db1.flush();
 
       // Reopen same storage
@@ -310,8 +310,8 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db1.set("key", new Float32Array([1, 0, 0, 0]));
-      db1.set("key", new Float32Array([0, 0, 0, 1]));
+      db1.set("key", [1, 0, 0, 0]);
+      db1.set("key", [0, 0, 0, 1]);
       await db1.flush();
 
       const db2 = await VectorDB.open({
@@ -334,7 +334,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([1, 0, 0, 0]));
+      db.set("a", [1, 0, 0, 0]);
       await db.close();
 
       // Should be persisted
@@ -347,7 +347,7 @@ describe("VectorDB", () => {
       expect(db2.size).toBe(1);
 
       // Original instance should be closed
-      expect(() => db.set("b", new Float32Array(4))).toThrow("closed");
+      expect(() => db.set("b", [0, 0, 0, 0])).toThrow("closed");
     });
 
     it("close is idempotent", async () => {
@@ -369,8 +369,8 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([1, 0, 0, 0]));
-      db.set("b", new Float32Array([0, 1, 0, 0]));
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
       expect(db.size).toBe(2);
 
       await db.clear();
@@ -386,10 +386,10 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("old", new Float32Array([1, 0, 0, 0]));
+      db.set("old", [1, 0, 0, 0]);
       await db.clear();
 
-      db.set("new", new Float32Array([0, 1, 0, 0]));
+      db.set("new", [0, 1, 0, 0]);
       expect(db.size).toBe(1);
       expect(db.get("new")![1]).toBeCloseTo(1);
     });
@@ -402,7 +402,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([3, 0, 0, 0]));
+      db.set("a", [3, 0, 0, 0]);
       const result = db.get("a");
       // Should be normalized to unit length
       expect(result![0]).toBeCloseTo(1.0);
@@ -416,7 +416,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([3, 0, 0, 0]));
+      db.set("a", [3, 0, 0, 0]);
       const result = db.get("a");
       expect(result![0]).toBeCloseTo(3.0);
     });
@@ -429,7 +429,7 @@ describe("VectorDB", () => {
         wasmBinary,
       });
 
-      db.set("a", new Float32Array([3, 0, 0, 0]), { normalize: true });
+      db.set("a", [3, 0, 0, 0], { normalize: true });
       const result = db.get("a");
       expect(result![0]).toBeCloseTo(1.0);
     });

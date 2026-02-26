@@ -42,7 +42,7 @@ db.setMany([
 
 Notes:
 
-- Each vector must be a `Float32Array` with exactly `dimensions` elements.
+- Each vector must be a `number[]` (or `Float32Array`) with exactly `dimensions` elements.
 - Duplicate keys use last-write-wins semantics.
 
 ### 3) Query nearest vectors
@@ -83,7 +83,7 @@ export { DB };
 export { ResultSet };
 export type { ResultItem };
 export { VectorCapacityExceededError };
-export type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions };
+export type { OpenOptions, OpenOptionsInternal, SetOptions, QueryOptions, VectorInput };
 export { InMemoryStorageProvider, OPFSStorageProvider };
 export type { StorageProvider };
 ```
@@ -105,16 +105,16 @@ Opens (or creates) a database instance and loads persisted data.
 
 #### Methods
 
-- `set(key: string, value: Float32Array, options?: SetOptions): void`
+- `set(key: string, value: VectorInput, options?: SetOptions): void`
   - Inserts or overwrites a vector.
   - Throws on dimension mismatch.
-- `get(key: string): Float32Array | undefined`
+- `get(key: string): number[] | undefined`
   - Returns a copy of the stored vector.
-- `setMany(entries: [string, Float32Array][]): void`
+- `setMany(entries: [string, VectorInput][]): void`
   - Batch insert/update.
-- `getMany(keys: string[]): (Float32Array | undefined)[]`
+- `getMany(keys: string[]): (number[] | undefined)[]`
   - Batch lookup.
-- `query(value: Float32Array, options?: QueryOptions): ResultSet`
+- `query(value: VectorInput, options?: QueryOptions): ResultSet`
   - Returns similarity-ranked results.
   - Throws on dimension mismatch.
 - `flush(): Promise<void>`
