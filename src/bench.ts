@@ -4,7 +4,7 @@
  */
 import { normalize as jsNormalize, searchAll as jsSearchAll } from "./lib/compute";
 import { getSimdWasmBinary } from "./lib/simd-binary";
-import { instantiateWasm, type WasmExports } from "./lib/wasm-compute";
+import { instantiateWasm } from "./lib/wasm-compute";
 
 const DIMENSIONS = 1536;
 const WARMUP_ITERATIONS = 50;
