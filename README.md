@@ -8,6 +8,8 @@ High-performance vector database for the web, powered by Web Assembly.
 - WASM SIMD for fast compute when available
 - JavaScript fallback when WASM SIMD is unavailable
 
+Try a [demo](https://chuanqisun.github.io/eigen-db/) or run the [benchmark](https://chuanqisun.github.io/eigen-db//bench) in browser.
+
 ## Install
 
 > [!WARNING]
