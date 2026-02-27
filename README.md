@@ -183,6 +183,7 @@ Opens (or creates) a database instance and loads persisted data.
 #### Properties
 
 - `size: number` — current number of key-vector pairs
+- `dimensions: number` — number of dimensions per vector
 
 #### Methods
 

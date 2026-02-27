@@ -38,7 +38,7 @@ const STREAM_CHUNK_SIZE = 65536;
 export class VectorDB {
   private readonly memoryManager: MemoryManager;
   private readonly storage: StorageProvider;
-  private readonly dimensions: number;
+  private readonly _dimensions: number;
   private readonly shouldNormalize: boolean;
   private wasmExports: WasmExports | null;
 
@@ -62,7 +62,7 @@ export class VectorDB {
   ) {
     this.memoryManager = memoryManager;
     this.storage = storage;
-    this.dimensions = dimensions;
+    this._dimensions = dimensions;
     this.shouldNormalize = shouldNormalize;
     this.wasmExports = wasmExports;
     this.keyToSlot = keyToSlot;
@@ -120,6 +120,11 @@ export class VectorDB {
   /** Total number of key-value pairs in the database */
   get size(): number {
     return this.keyToSlot.size;
+  }
+
+  /** Number of dimensions per vector */
+  get dimensions(): number {
+    return this._dimensions;
   }
 
   /**
@@ -199,8 +204,8 @@ export class VectorDB {
   set(key: string, value: VectorInput, options?: SetOptions): void {
     this.assertOpen();
 
-    if (value.length !== this.dimensions) {
-      throw new Error(`Vector dimension mismatch: expected ${this.dimensions}, got ${value.length}`);
+    if (value.length !== this._dimensions) {
+      throw new Error(`Vector dimension mismatch: expected ${this._dimensions}, got ${value.length}`);
     }
 
     // Convert to Float32Array (also clones to avoid mutating caller's array)
@@ -284,8 +289,8 @@ export class VectorDB {
       return [];
     }
 
-    if (value.length !== this.dimensions) {
-      throw new Error(`Query vector dimension mismatch: expected ${this.dimensions}, got ${value.length}`);
+    if (value.length !== this._dimensions) {
+      throw new Error(`Query vector dimension mismatch: expected ${this._dimensions}, got ${value.length}`);
     }
 
     // Convert to Float32Array and optionally normalize the query vector
@@ -312,21 +317,21 @@ export class VectorDB {
         this.memoryManager.dbOffset,
         scoresOffset,
         totalVectors,
-        this.dimensions,
+        this._dimensions,
       );
     } else {
       const queryView = new Float32Array(
         this.memoryManager.memory.buffer,
         this.memoryManager.queryOffset,
-        this.dimensions,
+        this._dimensions,
       );
       const dbView = new Float32Array(
         this.memoryManager.memory.buffer,
         this.memoryManager.dbOffset,
-        totalVectors * this.dimensions,
+        totalVectors * this._dimensions,
       );
       const scoresView = new Float32Array(this.memoryManager.memory.buffer, scoresOffset, totalVectors);
-      searchAll(queryView, dbView, scoresView, totalVectors, this.dimensions);
+      searchAll(queryView, dbView, scoresView, totalVectors, this._dimensions);
     }
 
     // Read scores (make a copy so the buffer can be reused)
@@ -353,12 +358,12 @@ export class VectorDB {
     const totalVectors = this.memoryManager.vectorCount;
 
     // Serialize vectors from WASM memory
-    const vectorBytes = new Uint8Array(totalVectors * this.dimensions * 4);
+    const vectorBytes = new Uint8Array(totalVectors * this._dimensions * 4);
     if (totalVectors > 0) {
       const src = new Uint8Array(
         this.memoryManager.memory.buffer,
         this.memoryManager.dbOffset,
-        totalVectors * this.dimensions * 4,
+        totalVectors * this._dimensions * 4,
       );
       vectorBytes.set(src);
     }
@@ -405,7 +410,7 @@ export class VectorDB {
     this.assertOpen();
 
     const totalVectors = this.memoryManager.vectorCount;
-    const vectorDataLen = totalVectors * this.dimensions * 4;
+    const vectorDataLen = totalVectors * this._dimensions * 4;
 
     // Encode keys (typically much smaller than vectors)
     const keysBytes = encodeLexicon(this.slotToKey);
@@ -416,7 +421,7 @@ export class VectorDB {
     const headerView = new DataView(header);
     headerView.setUint32(0, EXPORT_MAGIC, true);
     headerView.setUint32(4, EXPORT_VERSION, true);
-    headerView.setUint32(8, this.dimensions, true);
+    headerView.setUint32(8, this._dimensions, true);
     headerView.setUint32(12, totalVectors, true);
     headerView.setUint32(16, vectorDataLen, true);
     headerView.setUint32(20, keysDataLen, true);
@@ -485,8 +490,8 @@ export class VectorDB {
     }
 
     const dimensions = headerView.getUint32(8, true);
-    if (dimensions !== this.dimensions) {
-      throw new Error(`Import dimension mismatch: expected ${this.dimensions}, got ${dimensions}`);
+    if (dimensions !== this._dimensions) {
+      throw new Error(`Import dimension mismatch: expected ${this._dimensions}, got ${dimensions}`);
     }
 
     const vectorCount = headerView.getUint32(12, true);

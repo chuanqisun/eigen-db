@@ -94,6 +94,16 @@ describe("VectorDB", () => {
       expect(db.size).toBe(0);
     });
 
+    it("exposes dimensions property", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      expect(db.dimensions).toBe(4);
+    });
+
     // --- set and get ---
     it("stores and retrieves a vector by key", async () => {
       const db = await VectorDB.open({
