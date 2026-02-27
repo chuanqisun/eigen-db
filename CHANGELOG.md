@@ -1,3 +1,7 @@
+# v4.4.0
+
+Added: `entries()`, `keys()`, `values()`, `delete()`, `has()` methods, and `dimensions` property
+
 # v4.3.0
 
 Added: option to choose between in memory or OPFS storage backends
