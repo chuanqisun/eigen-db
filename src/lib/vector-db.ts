@@ -123,6 +123,76 @@ export class VectorDB {
   }
 
   /**
+   * Check whether a key exists in the database.
+   * Uses the internal key-to-slot map for O(1) lookup.
+   */
+  has(key: string): boolean {
+    this.assertOpen();
+    return this.keyToSlot.has(key);
+  }
+
+  /**
+   * Delete an entry by key. Returns true if the key existed, false otherwise.
+   * Uses swap-and-pop to avoid gaps in the underlying vector array.
+   */
+  delete(key: string): boolean {
+    this.assertOpen();
+
+    const slot = this.keyToSlot.get(key);
+    if (slot === undefined) return false;
+
+    const lastSlot = this.memoryManager.vectorCount - 1;
+
+    if (slot !== lastSlot) {
+      // Move last vector into the deleted slot
+      const lastVector = new Float32Array(this.memoryManager.readVector(lastSlot));
+      this.memoryManager.writeVector(slot, lastVector);
+
+      // Update mappings for the moved key
+      const movedKey = this.slotToKey[lastSlot];
+      this.keyToSlot.set(movedKey, slot);
+      this.slotToKey[slot] = movedKey;
+    }
+
+    // Remove the deleted key and shrink
+    this.keyToSlot.delete(key);
+    this.slotToKey.length = lastSlot;
+    this.memoryManager.setVectorCount(lastSlot);
+
+    return true;
+  }
+
+  /**
+   * Returns an iterable of all keys in the database.
+   */
+  keys(): IterableIterator<string> {
+    this.assertOpen();
+    return this.keyToSlot.keys();
+  }
+
+  /**
+   * Returns an iterable of [key, value] pairs.
+   * Values are returned as plain number array copies.
+   */
+  entries(): IterableIterator<[string, number[]]> {
+    this.assertOpen();
+    const keyToSlot = this.keyToSlot;
+    const mm = this.memoryManager;
+    return (function* () {
+      for (const [key, slot] of keyToSlot) {
+        yield [key, Array.from(mm.readVector(slot))] as [string, number[]];
+      }
+    })();
+  }
+
+  /**
+   * Implements the iterable protocol. Same as entries().
+   */
+  [Symbol.iterator](): IterableIterator<[string, number[]]> {
+    return this.entries();
+  }
+
+  /**
    * Set a key-value pair. If the key already exists, its vector is overwritten (last-write-wins).
    * The value is a number[] or Float32Array of length equal to the configured dimensions.
    */

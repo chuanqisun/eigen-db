@@ -838,6 +838,284 @@ describe("VectorDB", () => {
       expect(db2.get("gamma")![2]).toBeCloseTo(1);
     });
 
+    // --- has ---
+    it("has returns true for existing key", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      expect(db.has("a")).toBe(true);
+    });
+
+    it("has returns false for non-existent key", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      expect(db.has("nonexistent")).toBe(false);
+    });
+
+    it("has throws on closed database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      await db.close();
+      expect(() => db.has("a")).toThrow("closed");
+    });
+
+    // --- delete ---
+    it("delete removes an existing entry and returns true", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+      expect(db.size).toBe(2);
+
+      const result = db.delete("a");
+      expect(result).toBe(true);
+      expect(db.size).toBe(1);
+      expect(db.get("a")).toBeUndefined();
+      expect(db.has("a")).toBe(false);
+      expect(db.get("b")).toBeDefined();
+    });
+
+    it("delete returns false for non-existent key", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      expect(db.delete("nonexistent")).toBe(false);
+    });
+
+    it("delete last entry leaves empty database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("only", [1, 2, 3, 4]);
+      db.delete("only");
+      expect(db.size).toBe(0);
+      expect(db.get("only")).toBeUndefined();
+    });
+
+    it("delete preserves remaining entries and query works", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("z-axis", [0, 0, 1, 0]);
+
+      db.delete("y-axis");
+      expect(db.size).toBe(2);
+
+      const results = db.query([1, 0, 0, 0]);
+      expect(results.length).toBe(2);
+      expect(results[0].key).toBe("x-axis");
+      expect(results.find((r) => r.key === "y-axis")).toBeUndefined();
+    });
+
+    it("delete then set reuses the database correctly", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+      db.delete("a");
+
+      db.set("c", [0, 0, 1, 0]);
+      expect(db.size).toBe(2);
+      expect(db.get("a")).toBeUndefined();
+      expect(db.get("b")![1]).toBeCloseTo(1);
+      expect(db.get("c")![2]).toBeCloseTo(1);
+    });
+
+    it("delete persists correctly after flush", async () => {
+      const db1 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db1.set("a", [1, 0, 0, 0]);
+      db1.set("b", [0, 1, 0, 0]);
+      db1.delete("a");
+      await db1.flush();
+
+      const db2 = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      expect(db2.size).toBe(1);
+      expect(db2.get("a")).toBeUndefined();
+      expect(db2.get("b")![1]).toBeCloseTo(1);
+    });
+
+    it("delete throws on closed database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      await db.close();
+      expect(() => db.delete("a")).toThrow("closed");
+    });
+
+    // --- keys ---
+    it("keys returns an iterable of all keys", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+      db.set("c", [0, 0, 1, 0]);
+
+      const keys = [...db.keys()];
+      expect(keys).toHaveLength(3);
+      expect(keys).toContain("a");
+      expect(keys).toContain("b");
+      expect(keys).toContain("c");
+    });
+
+    it("keys returns empty iterable for empty database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      expect([...db.keys()]).toEqual([]);
+    });
+
+    it("keys throws on closed database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      await db.close();
+      expect(() => db.keys()).toThrow("closed");
+    });
+
+    // --- entries ---
+    it("entries returns an iterable of [key, value] pairs", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+
+      const entries = [...db.entries()];
+      expect(entries).toHaveLength(2);
+
+      const aEntry = entries.find(([key]) => key === "a");
+      expect(aEntry).toBeDefined();
+      expect(aEntry![1][0]).toBeCloseTo(1);
+
+      const bEntry = entries.find(([key]) => key === "b");
+      expect(bEntry).toBeDefined();
+      expect(bEntry![1][1]).toBeCloseTo(1);
+    });
+
+    it("entries returns empty iterable for empty database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      expect([...db.entries()]).toEqual([]);
+    });
+
+    it("entries throws on closed database", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      await db.close();
+      expect(() => db.entries()).toThrow("closed");
+    });
+
+    // --- Symbol.iterator ---
+    it("supports spread operator via Symbol.iterator", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+
+      const spread = [...db];
+      expect(spread).toHaveLength(2);
+
+      // Same as entries()
+      const entries = [...db.entries()];
+      expect(spread).toEqual(entries);
+    });
+
+    it("supports for-of iteration", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        normalize: false,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("a", [1, 0, 0, 0]);
+      db.set("b", [0, 1, 0, 0]);
+
+      const collected: [string, number[]][] = [];
+      for (const entry of db) {
+        collected.push(entry);
+      }
+      expect(collected).toHaveLength(2);
+    });
+
     it("import works correctly with single-byte stream chunks", async () => {
       const db1 = await VectorDB.open({
         dimensions: 4,

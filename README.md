@@ -191,10 +191,20 @@ Opens (or creates) a database instance and loads persisted data.
   - Throws on dimension mismatch.
 - `get(key: string): number[] | undefined`
   - Returns a copy of the stored vector.
+- `has(key: string): boolean`
+  - Returns `true` if the key exists, `false` otherwise. O(1) lookup.
+- `delete(key: string): boolean`
+  - Removes the entry for the given key. Returns `true` if the key existed, `false` otherwise.
 - `setMany(entries: [string, VectorInput][]): void`
   - Batch insert/update.
 - `getMany(keys: string[]): (number[] | undefined)[]`
   - Batch lookup.
+- `keys(): IterableIterator<string>`
+  - Returns an iterable of all keys.
+- `entries(): IterableIterator<[string, number[]]>`
+  - Returns an iterable of `[key, value]` pairs. Values are plain number array copies.
+- `[Symbol.iterator](): IterableIterator<[string, number[]]>`
+  - Same as `entries()`. Enables `[...db]` and `for...of` iteration.
 - `query(value: VectorInput, options?: QueryOptions): ResultItem[]`
   - Returns results sorted by descending similarity as a plain array.
   - Throws on dimension mismatch.
