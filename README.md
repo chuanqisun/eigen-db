@@ -56,7 +56,34 @@ Notes:
 - Each vector must be a `number[]` (or `Float32Array`) with exactly `dimensions` elements.
 - Duplicate keys use last-write-wins semantics.
 
-### 3) Query nearest vectors
+### 3) Look up, check, and remove vectors
+
+```ts
+db.get("doc:1"); // number[] | undefined
+db.has("doc:1"); // true
+db.delete("doc:1"); // true (removed), false (not found)
+db.dimensions; // configured vector dimensions
+db.size; // number of entries
+```
+
+### 4) Iterate over the database
+
+```ts
+// Iterate over all keys
+for (const key of db.keys()) {
+  console.log(key);
+}
+
+// Iterate over all [key, value] pairs
+for (const [key, vector] of db.entries()) {
+  console.log(key, vector);
+}
+
+// Spread into an array (uses Symbol.iterator, same as entries())
+const all = [...db];
+```
+
+### 5) Query nearest vectors
 
 ```ts
 const queryVector = embeddingQuery;
@@ -94,7 +121,7 @@ const results = db.query(queryVector, { minSimilarity: 0.7 });
 const results = db.query(queryVector, { minSimilarity: 0.7, iterable: true });
 ```
 
-### 4) Persist and lifecycle
+### 6) Persist and lifecycle
 
 ```ts
 await db.flush(); // persist current state
@@ -107,7 +134,7 @@ To delete all vectors and storage:
 await db.clear();
 ```
 
-### 5) Export and import
+### 7) Export and import
 
 Export the entire database as a streaming binary file:
 
