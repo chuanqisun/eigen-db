@@ -8,10 +8,10 @@ High-performance vector database for the web, powered by Web Assembly.
 - WASM SIMD for fast compute when available
 - JavaScript fallback when WASM SIMD is unavailable
 
+## Install
+
 > [!WARNING]
 > The project is in early development with frequent breaking changes and major version bumps in [semver](https://semver.org/).
-
-## Install
 
 ```bash
 npm install eigen-db
