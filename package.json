@@ -4,7 +4,6 @@
   "type": "module",
   "files": [
     "dist",
-    "src/lib",
     "CHANGELOG.md",
     "README.md"
   ],
@@ -12,16 +11,16 @@
   "module": "./dist/eigen-db.js",
   "exports": {
     ".": {
-      "types": "./src/lib/index.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/eigen-db.js",
       "require": "./dist/eigen-db.umd.cjs"
     }
   },
-  "types": "./src/lib/index.ts",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "dev": "vite",
     "compile-wat": "tsx scripts/compile-wat.ts",
-    "build": "npm run compile-wat && tsc && vite build",
+    "build": "npm run compile-wat && tsc && vite build && tsc -p tsconfig.build.json",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
