@@ -16,7 +16,7 @@ npm install eigen-db
 
 ## Guide: Set up and query
 
-### 1) Open a database
+### Open a database
 
 ```ts
 import { DB } from "eigen-db";
@@ -39,7 +39,7 @@ const db = await DB.open({
 });
 ```
 
-### 2) Insert vectors
+### Insert vectors
 
 ```ts
 db.set("doc:1", embedding1);
@@ -56,7 +56,7 @@ Notes:
 - Each vector must be a `number[]` (or `Float32Array`) with exactly `dimensions` elements.
 - Duplicate keys use last-write-wins semantics.
 
-### 3) Look up, check, and remove vectors
+### Look up, check, and remove vectors
 
 ```ts
 db.get("doc:1"); // number[] | undefined
@@ -66,7 +66,7 @@ db.dimensions; // configured vector dimensions
 db.size; // number of entries
 ```
 
-### 4) Iterate over the database
+### Iterate over the database
 
 ```ts
 // Iterate over all keys
@@ -83,7 +83,7 @@ for (const [key, vector] of db.entries()) {
 const all = [...db];
 ```
 
-### 5) Query nearest vectors
+### Query nearest vectors
 
 ```ts
 const queryVector = embeddingQuery;
@@ -121,7 +121,7 @@ const results = db.query(queryVector, { minSimilarity: 0.7 });
 const results = db.query(queryVector, { minSimilarity: 0.7, iterable: true });
 ```
 
-### 6) Persist and lifecycle
+### Persist and lifecycle
 
 ```ts
 await db.flush(); // persist current state
@@ -134,7 +134,7 @@ To delete all vectors and storage:
 await db.clear();
 ```
 
-### 7) Export and import
+### Export and import
 
 Export the entire database as a streaming binary file:
 
@@ -177,11 +177,11 @@ Similarity is the dot product of the query and stored vectors.
 
 **When to normalize:**
 
-| Scenario | Normalize? | Notes |
-| --- | --- | --- |
+| Scenario                                   | Normalize?       | Notes                                                                       |
+| ------------------------------------------ | ---------------- | --------------------------------------------------------------------------- |
 | Using embeddings from OpenAI, Cohere, etc. | `true` (default) | Embeddings may not be unit-length; normalization ensures cosine similarity. |
-| Vectors are already unit-length | Either | Setting `false` avoids redundant work. |
-| You need raw dot-product semantics | `false` | Similarity will be the raw dot product; range depends on vector magnitudes. |
+| Vectors are already unit-length            | Either           | Setting `false` avoids redundant work.                                      |
+| You need raw dot-product semantics         | `false`          | Similarity will be the raw dot product; range depends on vector magnitudes. |
 
 ## Full API Reference
 
@@ -349,12 +349,12 @@ Thrown when memory growth would exceed WASM 32-bit memory limits for the configu
 
 WASM SIMD vs pure JavaScript performance on 1536-dimensional vectors (OpenAI embedding size), measured with `vitest bench` (Node.js):
 
-| Operation | JS (ops/s) | WASM SIMD (ops/s) | Speedup |
-| --- | --- | --- | --- |
-| normalize (1536 dims) | 223,117 | 2,226,734 | **~10×** |
-| searchAll (100 vectors × 1536 dims) | 3,429 | 77,130 | **~22×** |
-| searchAll (1,000 vectors × 1536 dims) | 344 | 8,009 | **~23×** |
-| searchAll (10,000 vectors × 1536 dims) | 34 | 398 | **~12×** |
+| Operation                              | JS (ops/s) | WASM SIMD (ops/s) | Speedup  |
+| -------------------------------------- | ---------- | ----------------- | -------- |
+| normalize (1536 dims)                  | 223,117    | 2,226,734         | **~10×** |
+| searchAll (100 vectors × 1536 dims)    | 3,429      | 77,130            | **~22×** |
+| searchAll (1,000 vectors × 1536 dims)  | 344        | 8,009             | **~23×** |
+| searchAll (10,000 vectors × 1536 dims) | 34         | 398               | **~12×** |
 
 The WASM SIMD layer uses 2-vector outer loop unrolling (halving query memory reads) and 4× inner loop unrolling with multiple independent accumulators.
 
