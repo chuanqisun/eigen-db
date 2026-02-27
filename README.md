@@ -368,6 +368,8 @@ WASM SIMD vs pure JavaScript performance on 1536-dimensional vectors (OpenAI emb
 | searchAll (1,000 vectors × 1536 dims)  | 280        | 2,311             | **~8×** |
 | searchAll (10,000 vectors × 1536 dims) | 34         | 189               | **~6×** |
 
+System spec: Linux 6.12.10, Intel i7-1065G7@3.90 GHz, 32 GB RAM, node v24.4.1
+
 ### Running benchmarks
 
 **Node.js** (via vitest):
