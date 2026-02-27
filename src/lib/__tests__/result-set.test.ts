@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { iterableResults, topKResults } from "../result-set";
+import { iterableResults, queryResults } from "../result-set";
 
-describe("topKResults", () => {
+describe("queryResults", () => {
   const keys = ["apple", "banana", "cherry", "date", "elderberry"];
   const resolveKey = (index: number) => keys[index];
 
-  it("sorts results by descending similarity", () => {
+  it("sorts results by descending similarity (default order)", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    const results = topKResults(scores, resolveKey, 5);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend" });
 
     expect(results).toHaveLength(5);
     expect(results[0].key).toBe("banana");
@@ -19,9 +19,22 @@ describe("topKResults", () => {
     expect(results[4].key).toBe("cherry");
   });
 
-  it("respects topK limit", () => {
+  it("sorts results by ascending similarity", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    const results = topKResults(scores, resolveKey, 3);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "ascend" });
+
+    expect(results).toHaveLength(5);
+    expect(results[0].key).toBe("cherry");
+    expect(results[0].similarity).toBeCloseTo(0.1, 4);
+    expect(results[1].key).toBe("apple");
+    expect(results[1].similarity).toBeCloseTo(0.3, 4);
+    expect(results[4].key).toBe("banana");
+    expect(results[4].similarity).toBeCloseTo(0.9, 4);
+  });
+
+  it("respects limit", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = queryResults(scores, resolveKey, { limit: 3, order: "descend" });
 
     expect(results).toHaveLength(3);
     expect(results[0].key).toBe("banana");
@@ -31,20 +44,19 @@ describe("topKResults", () => {
 
   it("handles empty scores", () => {
     const scores = new Float32Array(0);
-    const results = topKResults(scores, resolveKey, 10);
+    const results = queryResults(scores, resolveKey, { limit: 10, order: "descend" });
     expect(results).toEqual([]);
   });
 
-  it("handles topK larger than result count", () => {
+  it("handles limit larger than result count", () => {
     const scores = new Float32Array([0.5, 0.8]);
-    const results = topKResults(scores, resolveKey, 100);
+    const results = queryResults(scores, resolveKey, { limit: 100, order: "descend" });
     expect(results).toHaveLength(2);
   });
 
   it("filters results by minSimilarity", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    // similarities: apple=0.3, banana=0.9, cherry=0.1, date=0.7, elderberry=0.5
-    const results = topKResults(scores, resolveKey, 5, 0.5);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend", minSimilarity: 0.5 });
 
     expect(results).toHaveLength(3);
     expect(results[0].key).toBe("banana");
@@ -57,15 +69,81 @@ describe("topKResults", () => {
 
   it("minSimilarity is inclusive", () => {
     const scores = new Float32Array([0.5]);
-    // similarity = 0.5
-    const results = topKResults(scores, resolveKey, 10, 0.5);
+    const results = queryResults(scores, resolveKey, { limit: 10, order: "descend", minSimilarity: 0.5 });
     expect(results).toHaveLength(1);
   });
 
-  it("handles topK Infinity", () => {
+  it("filters results by maxSimilarity", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    const results = topKResults(scores, resolveKey, Infinity);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend", maxSimilarity: 0.7 });
+
+    expect(results).toHaveLength(4);
+    expect(results[0].key).toBe("date");
+    expect(results[0].similarity).toBeCloseTo(0.7, 4);
+    expect(results[1].key).toBe("elderberry");
+    expect(results[2].key).toBe("apple");
+    expect(results[3].key).toBe("cherry");
+  });
+
+  it("maxSimilarity is inclusive", () => {
+    const scores = new Float32Array([0.5]);
+    const results = queryResults(scores, resolveKey, { limit: 10, order: "descend", maxSimilarity: 0.5 });
+    expect(results).toHaveLength(1);
+  });
+
+  it("filters by both minSimilarity and maxSimilarity", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend", minSimilarity: 0.3, maxSimilarity: 0.7 });
+
+    expect(results).toHaveLength(3);
+    expect(results[0].key).toBe("date");
+    expect(results[1].key).toBe("elderberry");
+    expect(results[2].key).toBe("apple");
+  });
+
+  it("handles limit Infinity", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend" });
     expect(results).toHaveLength(5);
+  });
+
+  it("supports full similarity range [-1, 1]", () => {
+    const scores = new Float32Array([-1.0, -0.5, 0.0, 0.5, 1.0]);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend" });
+
+    expect(results).toHaveLength(5);
+    expect(results[0].similarity).toBeCloseTo(1.0, 5);
+    expect(results[4].similarity).toBeCloseTo(-1.0, 5);
+  });
+
+  it("handles tiny floating point values near boundaries", () => {
+    const epsilon = 1e-7;
+    const scores = new Float32Array([0.5 - epsilon, 0.5, 0.5 + epsilon]);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "descend", minSimilarity: 0.5 });
+
+    // 0.5 and 0.5 + epsilon should pass, 0.5 - epsilon should not
+    expect(results).toHaveLength(2);
+  });
+
+  it("ascending order with limit returns bottomK", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = queryResults(scores, resolveKey, { limit: 2, order: "ascend" });
+
+    expect(results).toHaveLength(2);
+    expect(results[0].key).toBe("cherry");
+    expect(results[0].similarity).toBeCloseTo(0.1, 4);
+    expect(results[1].key).toBe("apple");
+    expect(results[1].similarity).toBeCloseTo(0.3, 4);
+  });
+
+  it("ascending order with minSimilarity and maxSimilarity", () => {
+    const scores = new Float32Array([-1.0, -0.5, 0.0, 0.5, 1.0]);
+    const results = queryResults(scores, resolveKey, { limit: Infinity, order: "ascend", minSimilarity: -0.5, maxSimilarity: 0.5 });
+
+    expect(results).toHaveLength(3);
+    expect(results[0].similarity).toBeCloseTo(-0.5, 5);
+    expect(results[1].similarity).toBeCloseTo(0.0, 5);
+    expect(results[2].similarity).toBeCloseTo(0.5, 5);
   });
 });
 
@@ -75,7 +153,7 @@ describe("iterableResults", () => {
 
   it("sorts results by descending similarity", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    const results = [...iterableResults(scores, resolveKey, 5)];
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "descend" })];
 
     expect(results).toHaveLength(5);
     expect(results[0].key).toBe("banana");
@@ -84,16 +162,26 @@ describe("iterableResults", () => {
     expect(results[4].key).toBe("cherry");
   });
 
-  it("respects topK limit", () => {
+  it("sorts results by ascending similarity", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    const results = [...iterableResults(scores, resolveKey, 3)];
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "ascend" })];
+
+    expect(results).toHaveLength(5);
+    expect(results[0].key).toBe("cherry");
+    expect(results[0].similarity).toBeCloseTo(0.1, 4);
+    expect(results[4].key).toBe("banana");
+  });
+
+  it("respects limit", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = [...iterableResults(scores, resolveKey, { limit: 3, order: "descend" })];
 
     expect(results).toHaveLength(3);
     expect(results[0].key).toBe("banana");
   });
 
   it("handles empty scores", () => {
-    const results = [...iterableResults(new Float32Array(0), resolveKey, 10)];
+    const results = [...iterableResults(new Float32Array(0), resolveKey, { limit: 10, order: "descend" })];
     expect(results).toEqual([]);
   });
 
@@ -105,7 +193,7 @@ describe("iterableResults", () => {
     };
 
     const scores = new Float32Array([0.3, 0.9, 0.1]);
-    const iterable = iterableResults(scores, lazyResolver, 3);
+    const iterable = iterableResults(scores, lazyResolver, { limit: Infinity, order: "descend" });
 
     expect(callCount).toBe(0); // no key resolved yet
 
@@ -119,7 +207,7 @@ describe("iterableResults", () => {
 
   it("is re-iterable", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1]);
-    const iterable = iterableResults(scores, resolveKey, 3);
+    const iterable = iterableResults(scores, resolveKey, { limit: Infinity, order: "descend" });
 
     const first = [...iterable];
     const second = [...iterable];
@@ -128,7 +216,7 @@ describe("iterableResults", () => {
 
   it("supports partial iteration (early break)", () => {
     const scores = new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5]);
-    const iterable = iterableResults(scores, resolveKey, 5);
+    const iterable = iterableResults(scores, resolveKey, { limit: Infinity, order: "descend" });
 
     const partial: string[] = [];
     for (const item of iterable) {
@@ -140,10 +228,9 @@ describe("iterableResults", () => {
     expect(partial[1]).toBe("date"); // similarity 0.4
   });
 
-  it("early stops iteration by minSimilarity", () => {
+  it("filters by minSimilarity", () => {
     const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
-    // similarities: apple=0.3, banana=0.9, cherry=0.1, date=0.7, elderberry=0.5
-    const results = [...iterableResults(scores, resolveKey, 5, 0.5)];
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "descend", minSimilarity: 0.5 })];
 
     expect(results).toHaveLength(3);
     expect(results[0].key).toBe("banana");
@@ -153,8 +240,40 @@ describe("iterableResults", () => {
 
   it("minSimilarity is inclusive", () => {
     const scores = new Float32Array([0.5]);
-    // similarity = 0.5
-    const results = [...iterableResults(scores, resolveKey, 10, 0.5)];
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "descend", minSimilarity: 0.5 })];
     expect(results).toHaveLength(1);
+  });
+
+  it("filters by maxSimilarity", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "descend", maxSimilarity: 0.7 })];
+
+    expect(results).toHaveLength(4);
+    expect(results[0].key).toBe("date");
+    expect(results[3].key).toBe("cherry");
+  });
+
+  it("maxSimilarity is inclusive", () => {
+    const scores = new Float32Array([0.5]);
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "descend", maxSimilarity: 0.5 })];
+    expect(results).toHaveLength(1);
+  });
+
+  it("ascending order with limit returns bottomK", () => {
+    const scores = new Float32Array([0.3, 0.9, 0.1, 0.7, 0.5]);
+    const results = [...iterableResults(scores, resolveKey, { limit: 2, order: "ascend" })];
+
+    expect(results).toHaveLength(2);
+    expect(results[0].key).toBe("cherry");
+    expect(results[1].key).toBe("apple");
+  });
+
+  it("supports full similarity range [-1, 1]", () => {
+    const scores = new Float32Array([-1.0, -0.5, 0.0, 0.5, 1.0]);
+    const results = [...iterableResults(scores, resolveKey, { limit: Infinity, order: "ascend" })];
+
+    expect(results).toHaveLength(5);
+    expect(results[0].similarity).toBeCloseTo(-1.0, 5);
+    expect(results[4].similarity).toBeCloseTo(1.0, 5);
   });
 });

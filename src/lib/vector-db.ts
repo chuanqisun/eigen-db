@@ -17,7 +17,7 @@ import { VectorCapacityExceededError } from "./errors";
 import { decodeLexicon, encodeLexicon } from "./lexicon";
 import { MemoryManager } from "./memory-manager";
 import type { ResultItem } from "./result-set";
-import { iterableResults, topKResults } from "./result-set";
+import { iterableResults, queryResults } from "./result-set";
 import { getSimdWasmBinary } from "./simd-binary";
 import type { StorageProvider } from "./storage";
 import { InMemoryStorageProvider } from "./storage";
@@ -281,8 +281,10 @@ export class VectorDB {
   query(value: VectorInput, options?: QueryOptions): ResultItem[] | Iterable<ResultItem> {
     this.assertOpen();
 
-    const k = options?.topK ?? Infinity;
+    const limit = options?.limit ?? Infinity;
+    const order = options?.order ?? "descend";
     const minSimilarity = options?.minSimilarity;
+    const maxSimilarity = options?.maxSimilarity;
     const iterable = options && "iterable" in options && options.iterable;
 
     if (this.size === 0) {
@@ -343,10 +345,12 @@ export class VectorDB {
       return slotToKey[slotIndex];
     };
 
+    const resultOptions = { limit, order, minSimilarity, maxSimilarity } as const;
+
     if (iterable) {
-      return iterableResults(scores, resolveKey, k, minSimilarity);
+      return iterableResults(scores, resolveKey, resultOptions);
     }
-    return topKResults(scores, resolveKey, k, minSimilarity);
+    return queryResults(scores, resolveKey, resultOptions);
   }
 
   /**

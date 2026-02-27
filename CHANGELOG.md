@@ -1,3 +1,7 @@
+# v5.0.0
+
+Changed: replaced `topK` with `limit` and `order` parameters in `query()` method
+
 # v4.4.0
 
 Added: `entries()`, `keys()`, `values()`, `delete()`, `has()` methods, and `dimensions` property

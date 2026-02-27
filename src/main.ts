@@ -154,7 +154,7 @@ async function main() {
     log("Searching…");
     const start = performance.now();
     const queryVec = embed(query);
-    const results = db.query(queryVec, { topK });
+    const results = db.query(queryVec, { limit: topK });
     const elapsed = (performance.now() - start).toFixed(1);
 
     log(`Search: ${elapsed} ms — ${results.length} results from ${db.size} records (top ${topK})`);

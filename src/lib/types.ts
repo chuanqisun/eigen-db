@@ -38,9 +38,13 @@ export interface SetOptions {
  */
 export interface QueryOptions {
   /** Maximum number of results to return. Defaults to Infinity (all results). */
-  topK?: number;
+  limit?: number;
+  /** Result ordering. "ascend" sorts by ascending similarity, "descend" sorts by descending similarity. Defaults to "descend". */
+  order?: "ascend" | "descend";
   /** Minimum similarity threshold (inclusive). Results with similarity < minSimilarity are excluded. */
   minSimilarity?: number;
+  /** Maximum similarity threshold (inclusive). Results with similarity > maxSimilarity are excluded. */
+  maxSimilarity?: number;
   /** Override normalization for this call. */
   normalize?: boolean;
   /** When true, returns an Iterable<ResultItem> instead of ResultItem[]. */

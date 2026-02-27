@@ -248,7 +248,7 @@ describe("VectorDB", () => {
       expect(results[2].similarity).toBeCloseTo(0.0, 2);
     });
 
-    it("query respects topK option", async () => {
+    it("query respects limit option", async () => {
       const db = await VectorDB.open({
         dimensions: 4,
         storage,
@@ -259,7 +259,7 @@ describe("VectorDB", () => {
       db.set("b", [0, 1, 0, 0]);
       db.set("c", [0, 0, 1, 0]);
 
-      const results = db.query([1, 0, 0, 0], { topK: 2 });
+      const results = db.query([1, 0, 0, 0], { limit: 2 });
       expect(results.length).toBe(2);
     });
 
@@ -371,7 +371,7 @@ describe("VectorDB", () => {
       expect(results[1].key).toBe("xy-axis");
     });
 
-    it("query topK defaults to Infinity (returns all results)", async () => {
+    it("query limit defaults to Infinity (returns all results)", async () => {
       const db = await VectorDB.open({
         dimensions: 4,
         storage,
@@ -384,9 +384,193 @@ describe("VectorDB", () => {
         db.set(`v${i}`, vec);
       }
 
-      // Without topK, all 10 results should be returned
+      // Without limit, all 10 results should be returned
       const results = db.query([1, 0, 0, 0]);
       expect(results.length).toBe(10);
+    });
+
+    it("query with order ascend returns least similar first", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      const results = db.query([1, 0, 0, 0], { order: "ascend" });
+      expect(results.length).toBe(3);
+      // y-axis (similarity ≈ 0) should be first in ascending order
+      expect(results[0].key).toBe("y-axis");
+      expect(results[0].similarity).toBeCloseTo(0.0, 2);
+      // x-axis (similarity ≈ 1) should be last
+      expect(results[2].key).toBe("x-axis");
+      expect(results[2].similarity).toBeCloseTo(1.0, 2);
+    });
+
+    it("query with order ascend and limit returns bottomK", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      const results = db.query([1, 0, 0, 0], { order: "ascend", limit: 1 });
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("y-axis");
+    });
+
+    it("query respects maxSimilarity option", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      // Only return results with similarity ≤ 0.8 from the x-axis query
+      const results = db.query([1, 0, 0, 0], { maxSimilarity: 0.8 });
+      // x-axis: similarity ≈ 1 (excluded), xy-axis: similarity ≈ 0.71, y-axis: similarity ≈ 0
+      expect(results.length).toBe(2);
+      expect(results[0].key).toBe("xy-axis");
+      expect(results[1].key).toBe("y-axis");
+    });
+
+    it("query with both minSimilarity and maxSimilarity", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      // Only return results with 0.5 ≤ similarity ≤ 0.8
+      const results = db.query([1, 0, 0, 0], { minSimilarity: 0.5, maxSimilarity: 0.8 });
+      // xy-axis: similarity ≈ 0.71 (included)
+      // x-axis ≈ 1.0 (excluded), y-axis ≈ 0.0 (excluded)
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("xy-axis");
+    });
+
+    it("query maxSimilarity works with iterable mode", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      const results = [...db.query([1, 0, 0, 0], { maxSimilarity: 0.8, iterable: true })];
+      expect(results.length).toBe(2);
+      expect(results[0].key).toBe("xy-axis");
+      expect(results[1].key).toBe("y-axis");
+    });
+
+    it("query order ascend with iterable mode", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("x-axis", [1, 0, 0, 0]);
+      db.set("y-axis", [0, 1, 0, 0]);
+      db.set("xy-axis", [1, 1, 0, 0]);
+
+      const results = [...db.query([1, 0, 0, 0], { order: "ascend", iterable: true })];
+      expect(results.length).toBe(3);
+      expect(results[0].key).toBe("y-axis");
+      expect(results[2].key).toBe("x-axis");
+    });
+
+    it("query supports full similarity range [-1, 1] with opposite vectors", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("same", [1, 0, 0, 0]); // similarity ≈ 1
+      db.set("ortho", [0, 1, 0, 0]); // similarity ≈ 0
+      db.set("opposite", [-1, 0, 0, 0]); // similarity ≈ -1
+
+      const results = db.query([1, 0, 0, 0]);
+      expect(results.length).toBe(3);
+      expect(results[0].key).toBe("same");
+      expect(results[0].similarity).toBeCloseTo(1.0, 2);
+      expect(results[1].key).toBe("ortho");
+      expect(results[1].similarity).toBeCloseTo(0.0, 2);
+      expect(results[2].key).toBe("opposite");
+      expect(results[2].similarity).toBeCloseTo(-1.0, 2);
+    });
+
+    it("query minSimilarity works with negative values", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("same", [1, 0, 0, 0]); // similarity ≈ 1
+      db.set("ortho", [0, 1, 0, 0]); // similarity ≈ 0
+      db.set("opposite", [-1, 0, 0, 0]); // similarity ≈ -1
+
+      // minSimilarity = -0.5 should include same and ortho, exclude opposite
+      const results = db.query([1, 0, 0, 0], { minSimilarity: -0.5 });
+      expect(results.length).toBe(2);
+      expect(results[0].key).toBe("same");
+      expect(results[1].key).toBe("ortho");
+    });
+
+    it("query maxSimilarity works with negative values", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("same", [1, 0, 0, 0]); // similarity ≈ 1
+      db.set("ortho", [0, 1, 0, 0]); // similarity ≈ 0
+      db.set("opposite", [-1, 0, 0, 0]); // similarity ≈ -1
+
+      // maxSimilarity = -0.5 should include only opposite
+      const results = db.query([1, 0, 0, 0], { maxSimilarity: -0.5 });
+      expect(results.length).toBe(1);
+      expect(results[0].key).toBe("opposite");
+    });
+
+    it("query ascending order with negative similarities", async () => {
+      const db = await VectorDB.open({
+        dimensions: 4,
+        storage,
+        wasmBinary,
+      });
+
+      db.set("same", [1, 0, 0, 0]);
+      db.set("ortho", [0, 1, 0, 0]);
+      db.set("opposite", [-1, 0, 0, 0]);
+
+      const results = db.query([1, 0, 0, 0], { order: "ascend" });
+      expect(results.length).toBe(3);
+      expect(results[0].key).toBe("opposite");
+      expect(results[0].similarity).toBeCloseTo(-1.0, 2);
+      expect(results[2].key).toBe("same");
+      expect(results[2].similarity).toBeCloseTo(1.0, 2);
     });
 
     // --- flush and persistence ---

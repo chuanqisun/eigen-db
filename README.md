@@ -89,7 +89,7 @@ const all = [...db];
 const queryVector = embeddingQuery;
 
 // Returns a plain array of { key, similarity } sorted by descending similarity
-const results = db.query(queryVector, { topK: 10 });
+const results = db.query(queryVector, { limit: 10 });
 
 for (const { key, similarity } of results) {
   console.log(key, similarity);
@@ -99,7 +99,7 @@ for (const { key, similarity } of results) {
 For lazy iteration (useful for pagination or early stopping):
 
 ```ts
-const results = db.query(queryVector, { topK: 100, iterable: true });
+const results = db.query(queryVector, { limit: 100, iterable: true });
 
 // Iterate and break early — keys are resolved on demand
 for (const { key, similarity } of results) {
@@ -111,14 +111,24 @@ for (const { key, similarity } of results) {
 const all = [...results];
 ```
 
-Use `minSimilarity` to automatically cut off results below a threshold:
+Use `minSimilarity` and `maxSimilarity` to filter results by a similarity range:
 
 ```ts
 // Only return results with similarity ≥ 0.7 (inclusive)
 const results = db.query(queryVector, { minSimilarity: 0.7 });
 
-// Works with iterable mode too — iteration stops early at the threshold
-const results = db.query(queryVector, { minSimilarity: 0.7, iterable: true });
+// Only return results with similarity ≤ 0.5 (inclusive)
+const results = db.query(queryVector, { maxSimilarity: 0.5 });
+
+// Combine both for a range
+const results = db.query(queryVector, { minSimilarity: 0.3, maxSimilarity: 0.8 });
+```
+
+Use `order: "ascend"` to get the least similar results first (bottom-K):
+
+```ts
+// Least similar results first
+const bottomK = db.query(queryVector, { order: "ascend", limit: 10 });
 ```
 
 ### Persist and lifecycle
@@ -303,8 +313,10 @@ interface SetOptions {
 
 ```ts
 interface QueryOptions {
-  topK?: number; // default: Infinity (all results)
+  limit?: number; // default: Infinity (all results)
+  order?: "ascend" | "descend"; // default: "descend" (most similar first)
   minSimilarity?: number; // inclusive lower bound on similarity; results below this are excluded
+  maxSimilarity?: number; // inclusive upper bound on similarity; results above this are excluded
   normalize?: boolean;
   iterable?: boolean; // when true, returns Iterable<ResultItem> instead of ResultItem[]
 }
@@ -376,7 +388,8 @@ npm run dev
 ## Practical notes
 
 - Similarity is the dot product of query and stored vectors; with normalization enabled (default), this behaves like cosine similarity (1 = identical, -1 = opposite).
-- `topK` defaults to `Infinity`, returning all stored vectors sorted by similarity. Use `minSimilarity` to limit results by proximity.
+- `limit` defaults to `Infinity`, returning all stored vectors sorted by similarity. Use `minSimilarity` and `maxSimilarity` to filter results by proximity range.
+- `order` defaults to `"descend"` (most similar first). Use `"ascend"` to get least similar first.
 - Querying an empty database returns an empty array (`[]`).
 - `flush()` writes deduplicated state, and reopen preserves key-to-slot mapping.
 

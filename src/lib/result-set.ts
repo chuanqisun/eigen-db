@@ -3,7 +3,7 @@
  *
  * Utility functions for sorting scores and producing query results.
  * Two modes:
- *   1. topKResults  — eagerly materializes a ResultItem[] (default query path)
+ *   1. queryResults  — eagerly materializes a ResultItem[] (default query path)
  *   2. iterableResults — returns a lazy Iterable<ResultItem> where keys are
  *      resolved only as each item is consumed (for pagination / streaming)
  *
@@ -19,41 +19,65 @@ export interface ResultItem {
 
 export type KeyResolver = (index: number) => string;
 
+export interface ResultOptions {
+  limit: number;
+  order: "ascend" | "descend";
+  minSimilarity?: number;
+  maxSimilarity?: number;
+}
+
+/** Check whether a score falls within the [minSimilarity, maxSimilarity] range. */
+function inRange(similarity: number, minSimilarity?: number, maxSimilarity?: number): boolean {
+  if (minSimilarity !== undefined && similarity < minSimilarity) return false;
+  if (maxSimilarity !== undefined && similarity > maxSimilarity) return false;
+  return true;
+}
+
 /**
- * Sort by descending similarity and return the top K results as a plain array.
+ * Sort scores and return the top results as a plain array.
  * All keys are resolved eagerly.
- * If minSimilarity is provided, results with similarity < minSimilarity are excluded.
+ *
+ * `order` controls sort direction:
+ *   - "descend" (default) — highest similarity first
+ *   - "ascend" — lowest similarity first
+ *
+ * Results outside [minSimilarity, maxSimilarity] are excluded.
  */
-export function topKResults(
+export function queryResults(
   scores: Float32Array,
   resolveKey: KeyResolver,
-  topK: number,
-  minSimilarity?: number,
+  options: ResultOptions,
 ): ResultItem[] {
+  const { limit, order, minSimilarity, maxSimilarity } = options;
   const n = scores.length;
   if (n === 0) return [];
 
   const indices = new Uint32Array(n);
   for (let i = 0; i < n; i++) indices[i] = i;
-  indices.sort((a, b) => scores[b] - scores[a]);
 
-  const k = Math.min(topK, n);
+  if (order === "ascend") {
+    indices.sort((a, b) => scores[a] - scores[b]);
+  } else {
+    indices.sort((a, b) => scores[b] - scores[a]);
+  }
+
+  const k = Math.min(limit, n);
   const results: ResultItem[] = [];
-  for (let i = 0; i < k; i++) {
+  for (let i = 0; i < n && results.length < k; i++) {
     const idx = indices[i];
     const similarity = scores[idx];
-    if (minSimilarity !== undefined && similarity < minSimilarity) break;
+    if (!inRange(similarity, minSimilarity, maxSimilarity)) continue;
     results.push({ key: resolveKey(idx), similarity });
   }
   return results;
 }
 
 /**
- * Sort by descending similarity and return a lazy iterable over the top K results.
+ * Sort scores and return a lazy iterable over the results.
  * Keys are resolved only when each item is consumed, saving allocations
  * when the caller iterates partially (e.g., pagination).
  *
- * If minSimilarity is provided, iteration stops when similarity < minSimilarity.
+ * Results outside [minSimilarity, maxSimilarity] are skipped.
  *
  * The returned iterable is re-iterable — each call to [Symbol.iterator]()
  * produces a fresh cursor over the same pre-sorted data.
@@ -61,31 +85,38 @@ export function topKResults(
 export function iterableResults(
   scores: Float32Array,
   resolveKey: KeyResolver,
-  topK: number,
-  minSimilarity?: number,
+  options: ResultOptions,
 ): Iterable<ResultItem> {
+  const { limit, order, minSimilarity, maxSimilarity } = options;
   const n = scores.length;
   if (n === 0) return [];
 
   const indices = new Uint32Array(n);
   for (let i = 0; i < n; i++) indices[i] = i;
-  indices.sort((a, b) => scores[b] - scores[a]);
 
-  const k = Math.min(topK, n);
+  if (order === "ascend") {
+    indices.sort((a, b) => scores[a] - scores[b]);
+  } else {
+    indices.sort((a, b) => scores[b] - scores[a]);
+  }
 
   return {
     [Symbol.iterator](): Iterator<ResultItem> {
       let i = 0;
+      let emitted = 0;
       return {
         next(): IteratorResult<ResultItem> {
-          if (i >= k) return { done: true, value: undefined };
-          const idx = indices[i++];
-          const similarity = scores[idx];
-          if (minSimilarity !== undefined && similarity < minSimilarity) return { done: true, value: undefined };
-          return {
-            done: false,
-            value: { key: resolveKey(idx), similarity },
-          };
+          while (i < n && emitted < limit) {
+            const idx = indices[i++];
+            const similarity = scores[idx];
+            if (!inRange(similarity, minSimilarity, maxSimilarity)) continue;
+            emitted++;
+            return {
+              done: false,
+              value: { key: resolveKey(idx), similarity },
+            };
+          }
+          return { done: true, value: undefined };
         },
       };
     },
