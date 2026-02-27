@@ -1,6 +1,6 @@
 # Eigen DB
 
-High-performance vector database for the web.
+High-performance vector database for the web, powered by Web Assembly.
 
 `eigen-db` stores and queries embedding vectors in-browser, using:
 
