@@ -1,8 +1,13 @@
+:root {
+  color-scheme: dark light;
+}
+
 body {
   font-family: monospace;
   max-width: 640px;
   margin: 0 auto;
   padding: 1rem;
+  line-height: 1.5;
 }
 
 input,
@@ -10,6 +15,12 @@ button,
 select {
   font-family: inherit;
   font-size: inherit;
+}
+
+body {
+  & > * + * {
+    margin-top: 1rem;
+  }
 }
 
 table {
@@ -22,7 +33,7 @@ th,
 td {
   text-align: right;
   padding: 0.25rem 0.75rem;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid GrayText;
 }
 
 td:first-child,
@@ -35,7 +46,7 @@ th:first-child {
 }
 
 .env-info {
-  margin-top: 2rem;
+  color: GrayText;
 }
 
 #status {
