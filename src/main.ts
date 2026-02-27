@@ -27,40 +27,6 @@ function randomString(len: number): string {
 const EIGEN_DB_MIME = "application/x-eigen-db";
 
 async function main() {
-  const app = document.querySelector<HTMLDivElement>("#app")!;
-  app.innerHTML = `
-    <h1>web-vector-base demo</h1>
-    <p>In-browser vector search powered by WASM SIMD. Uses a simple character-frequency embedder.</p>
-
-    <fieldset>
-      <legend>Generate dataset</legend>
-      <label>Number of records: <input id="gen-count" type="number" value="1000" min="1" max="100000" /></label>
-      <button id="gen-btn">Generate &amp; index</button>
-    </fieldset>
-
-    <fieldset>
-      <legend>Search</legend>
-      <label>Query: <input id="search-input" type="text" value="abc" /></label>
-      <label>Top K: <input id="top-k" type="number" value="10" min="1" max="1000" /></label>
-      <button id="search-btn">Search</button>
-    </fieldset>
-
-    <fieldset>
-      <legend>Export / Import</legend>
-      <button id="export-btn" disabled>Export database (.bin)</button>
-      <label>Import: <input id="import-file" type="file" accept=".bin" /></label>
-    </fieldset>
-
-    <fieldset>
-      <legend>Persistent storage (OPFS)</legend>
-      <button id="load-btn">Load existing DB</button>
-      <button id="delete-btn">Delete DB</button>
-    </fieldset>
-
-    <div id="status">Initializing…</div>
-    <div id="results"></div>
-  `;
-
   const status = document.querySelector<HTMLDivElement>("#status")!;
   const resultsDiv = document.querySelector<HTMLDivElement>("#results")!;
   const exportBtn = document.querySelector<HTMLButtonElement>("#export-btn")!;
