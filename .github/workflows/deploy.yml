@@ -31,7 +31,7 @@ jobs:
       - name: npm install, build, and test
         run: |
           npm install
-          npm run build
+          npm run build:site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

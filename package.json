@@ -22,6 +22,7 @@
     "dev": "vite",
     "compile-wat": "tsx scripts/compile-wat.ts",
     "build": "npm run compile-wat && tsc && vite build && tsc -p tsconfig.build.json",
+    "build:site": "npm run compile-wat && vite build -c vite.config.site.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -9,15 +9,8 @@ export default defineConfig({
       fileName: "eigen-db",
     },
     sourcemap: true,
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, "index.html"),
-        bench: resolve(__dirname, "bench.html"),
-      },
-    },
   },
   test: {
     include: ["src/**/*.test.ts"],
   },
-  base: "/eigen-db/",
 });
