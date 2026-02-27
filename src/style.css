@@ -5,7 +5,9 @@ body {
   padding: 1rem;
 }
 
-input, button, select {
+input,
+button,
+select {
   font-family: inherit;
   font-size: inherit;
 }
@@ -16,7 +18,8 @@ table {
   margin: 1rem 0;
 }
 
-th, td {
+th,
+td {
   text-align: right;
   padding: 0.25rem 0.75rem;
   border-bottom: 1px solid #ccc;
